@@ -1,0 +1,134 @@
+import { Trash2, ShoppingCart, ArrowRight } from 'lucide-react';
+import { HostingPlan } from '../data/mockData';
+
+interface CartItem {
+  plan: HostingPlan;
+  duration: string;
+  price: number;
+}
+
+interface CartPageProps {
+  cart: CartItem[];
+  onRemoveFromCart: (index: number) => void;
+  onNavigate: (page: string) => void;
+}
+
+export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPageProps) {
+  const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
+
+  const getDurationLabel = (duration: string) => {
+    if (duration === 'monthly') return '1 tháng';
+    if (duration === 'quarterly') return '3 tháng';
+    return '12 tháng';
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-[#0B2B6F] mb-2">Giỏ hàng</h1>
+          <p className="text-gray-600">Kiểm tra lại đơn hàng trước khi thanh toán</p>
+        </div>
+
+        {cart.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <ShoppingCart className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-semibold text-gray-700 mb-2">Giỏ hàng trống</h2>
+            <p className="text-gray-500 mb-6">Bạn chưa có sản phẩm nào trong giỏ hàng</p>
+            <button
+              onClick={() => onNavigate('pricing')}
+              className="bg-[#034CC9] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
+            >
+              Xem sản phẩm
+            </button>
+          </div>
+        ) : (
+          <div className="grid lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-xl shadow-md overflow-hidden">
+                {cart.map((item, index) => (
+                  <div key={index} className="p-6 border-b last:border-b-0">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold text-[#0B2B6F] mb-1">
+                              {item.plan.name}
+                            </h3>
+                            <p className="text-sm text-gray-600 mb-3">
+                              {item.plan.type === 'wordpress' ? 'WordPress Hosting' : item.plan.type === 'business' ? 'Business Hosting' : 'Email Domain'}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => onRemoveFromCart(index)}
+                            className="text-red-500 hover:text-red-700 transition-colors p-2"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-500">Kỳ hạn</p>
+                            <p className="font-semibold text-gray-900">{getDurationLabel(item.duration)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Dung lượng</p>
+                            <p className="font-semibold text-gray-900">{item.plan.storage}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                      <span className="text-gray-600">Giá</span>
+                      <span className="text-2xl font-bold text-[#034CC9]">
+                        {item.price.toLocaleString('vi-VN')}₫
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-xl shadow-md p-6 sticky top-24">
+                <h2 className="text-xl font-bold text-[#0B2B6F] mb-6">Tóm tắt đơn hàng</h2>
+
+                <div className="space-y-4 mb-6">
+                  <div className="flex justify-between text-gray-700">
+                    <span>Tạm tính</span>
+                    <span className="font-semibold">{subtotal.toLocaleString('vi-VN')}₫</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>VAT (0%)</span>
+                    <span className="font-semibold">0₫</span>
+                  </div>
+                  <div className="border-t pt-4 flex justify-between items-center">
+                    <span className="text-lg font-semibold text-gray-900">Tổng cộng</span>
+                    <span className="text-2xl font-bold text-[#034CC9]">
+                      {subtotal.toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onNavigate('checkout')}
+                  className="w-full bg-[#034CC9] text-white py-4 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors flex items-center justify-center mb-3"
+                >
+                  Thanh toán
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </button>
+
+                <button
+                  onClick={() => onNavigate('pricing')}
+                  className="w-full bg-white text-[#034CC9] border-2 border-[#034CC9] py-3 rounded-lg font-semibold hover:bg-[#E6EEFF] transition-colors"
+                >
+                  Mua thêm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

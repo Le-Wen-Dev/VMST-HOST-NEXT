@@ -1,0 +1,3 @@
+ADMIN UI pocketbase: api.vmst.host
+username: admin@vmst.host
+pass: admin@!@#
