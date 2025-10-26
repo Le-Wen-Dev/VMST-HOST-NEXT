@@ -1,46 +1,87 @@
-import { useState } from 'react';
-import { User, Mail, Phone, Building, Lock, Save, Eye, EyeOff } from 'lucide-react';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
+import { useState, useEffect } from 'react';
+import { User, Mail, Phone, Building, Lock, Save, Eye, EyeOff, ChevronLeft } from 'lucide-react';
+
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ProfilePage({ onNavigate }: { onNavigate: (page: string) => void }) {
+  const { user, updateProfile, changePassword } = useAuth();
   const [activeTab, setActiveTab] = useState<'info' | 'password'>('info');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: 'Nguyễn Văn An',
-    email: 'nguyenvanan@example.com',
-    phone: '0901234567',
-    company: 'ABC Tech Co.',
-    address: '123 Đường ABC, Quận 1, TP.HCM'
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    address: ''
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: (user as any).phone || '',
+        company: '',
+        address: (user as any).address || (user.bio || ''),
+      });
+    }
+  }, [user]);
 
   const [passwordData, setPasswordData] = useState({
     newPassword: '',
     confirmPassword: ''
   });
 
-  const handleUpdateInfo = (e: React.FormEvent) => {
+  const handleUpdateInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Updating profile:', formData);
+    try {
+      const payload: any = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        bio: formData.address,
+      };
+      await updateProfile(payload);
+      alert('Cập nhật thông tin thành công');
+    } catch (err) {
+      alert('Không thể cập nhật thông tin.');
+      console.error(err);
+    }
   };
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       alert('Mật khẩu mới không khớp!');
       return;
     }
-    console.log('Changing password');
+    try {
+      await changePassword(passwordData.newPassword, passwordData.confirmPassword);
+      alert('Đổi mật khẩu thành công');
+      setPasswordData({ newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      alert('Không thể đổi mật khẩu.');
+      console.error(err);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Header onNavigate={onNavigate} />
+      {/* Removed duplicate Header - App already renders a global Header */}
 
       <div className="max-w-4xl mx-auto px-4 py-12">
         <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => { if (window.history.length > 1) window.history.back(); else onNavigate('portal'); }}
+              className="inline-flex items-center gap-2 text-sm text-gray-700 hover:text-[#034CC9]"
+            >
+              <ChevronLeft className="h-5 w-5" /> Quay lại
+            </button>
+          </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Thông tin tài khoản</h1>
           <p className="text-gray-600">Quản lý thông tin cá nhân và bảo mật tài khoản</p>
         </div>
@@ -230,7 +271,7 @@ export default function ProfilePage({ onNavigate }: { onNavigate: (page: string)
         </div>
       </div>
 
-      <Footer onNavigate={onNavigate} />
+      {/* Removed duplicate Footer - App already renders a global Footer */}
     </div>
   );
 }

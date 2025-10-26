@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Plus, Edit2, Trash2, Eye, Phone, Mail, Building, X, Save } from 'lucide-react';
-import { mockLeads } from '../../../data/adminData';
+import { listContacts, submitContact, updateContact, deleteContact } from '../../../services/contacts';
 import Modal, { ConfirmModal } from '../../../components/Modal';
 
 export default function LeadManagement() {
@@ -12,43 +12,135 @@ export default function LeadManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any>(null);
 
-  const filteredLeads = mockLeads.filter(lead => {
-    const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         lead.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || lead.status === statusFilter;
+  const [leads, setLeads] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  const [formName, setFormName] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formPhone, setFormPhone] = useState('');
+  const [formCompany, setFormCompany] = useState('');
+  const [formSource, setFormSource] = useState('contact-form');
+  const [formStatus, setFormStatus] = useState('new');
+  const [formAssignedTo, setFormAssignedTo] = useState('');
+  const [formNotes, setFormNotes] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  const fetchLeads = async () => {
+    try {
+      setLoading(true);
+      const statusMapInv: Record<string, string> = {
+        new: 'newlead',
+        contacted: 'contacted',
+        qualified: 'qualifiedlead',
+        converted: 'customer',
+        lost: 'lost',
+      };
+      const res = await listContacts({
+        page,
+        perPage,
+        status: statusFilter !== 'all' ? statusMapInv[statusFilter] : undefined,
+        search: debouncedSearch || undefined,
+      });
+      const mapped = (res.items || []).map((r: any) => {
+        const ua = r.user_agent || {};
+        const statusMap: Record<string, string> = {
+          newlead: 'new',
+          contacted: 'contacted',
+          qualifiedlead: 'qualified',
+          opportunity: 'qualified',
+          customer: 'converted',
+          lost: 'lost',
+        };
+        return {
+          id: r.id,
+          name: r.ho_va_ten,
+          email: r.email,
+          phone: r.so_dien_thoai,
+          company: ua.company || '',
+          source: r.trang_nhan_lead || 'contact-form',
+          status: statusMap[r.trang_thai || 'newlead'] || 'new',
+          assignedTo: ua.assignedTo || '',
+          notes: ua.notes || '',
+          createdDate: (r.created || '').slice(0, 19).replace('T', ' '),
+          _raw: r,
+        };
+      });
+      setLeads(mapped);
+      setTotalPages(res.totalPages || 1);
+      setTotalItems(res.totalItems || mapped.length);
+    } catch (err) {
+      console.error('Load contacts failed', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLeads();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, perPage, statusFilter, debouncedSearch]);
+
+  const filteredLeads = leads.filter((lead) => {
     const matchesSource = sourceFilter === 'all' || lead.source === sourceFilter;
-    return matchesSearch && matchesStatus && matchesSource;
+    return matchesSource;
   });
 
   const getStatusColor = (status: string) => {
     const colors = {
-      'new': 'bg-blue-100 text-blue-800',
-      'contacted': 'bg-yellow-100 text-yellow-800',
-      'qualified': 'bg-purple-100 text-purple-800',
-      'converted': 'bg-green-100 text-green-800',
-      'lost': 'bg-red-100 text-red-800'
+      new: 'bg-blue-100 text-blue-800',
+      contacted: 'bg-yellow-100 text-yellow-800',
+      qualified: 'bg-purple-100 text-purple-800',
+      converted: 'bg-green-100 text-green-800',
+      lost: 'bg-red-100 text-red-800',
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
   const getStatusLabel = (status: string) => {
     const labels = {
-      'new': 'Mới',
-      'contacted': 'Đã liên hệ',
-      'qualified': 'Tiềm năng',
-      'converted': 'Đã chuyển đổi',
-      'lost': 'Thất bại'
+      new: 'Mới',
+      contacted: 'Đã liên hệ',
+      qualified: 'Tiềm năng',
+      converted: 'Đã chuyển đổi',
+      lost: 'Thất bại',
     };
     return labels[status as keyof typeof labels] || status;
   };
 
   const handleCreate = () => {
     setSelectedLead(null);
+    setFormName('');
+    setFormEmail('');
+    setFormPhone('');
+    setFormCompany('');
+    setFormSource('contact-form');
+    setFormStatus('new');
+    setFormAssignedTo('');
+    setFormNotes('');
     setShowFormModal(true);
   };
 
   const handleEdit = (lead: any) => {
     setSelectedLead(lead);
+    setFormName(lead.name || '');
+    setFormEmail(lead.email || '');
+    setFormPhone(lead.phone || '');
+    setFormCompany(lead.company || '');
+    setFormSource(lead.source || 'contact-form');
+    setFormStatus(lead.status || 'new');
+    setFormAssignedTo(lead.assignedTo || '');
+    setFormNotes(lead.notes || '');
     setShowFormModal(true);
   };
 
@@ -62,14 +154,58 @@ export default function LeadManagement() {
     setShowDeleteModal(true);
   };
 
-  const handleSave = () => {
-    setShowFormModal(false);
-    setSelectedLead(null);
+  const handleSave = async () => {
+    try {
+      const invStatusMap: Record<string, string> = {
+        new: 'newlead',
+        contacted: 'contacted',
+        qualified: 'qualifiedlead',
+        converted: 'customer',
+        lost: 'lost',
+      };
+      if (!formName.trim() || !formEmail.trim()) {
+        return;
+      }
+      if (!selectedLead) {
+        const payload = {
+          ho_va_ten: formName.trim(),
+          email: formEmail.trim().toLowerCase(),
+          so_dien_thoai: formPhone.trim(),
+          trang_nhan_lead: formSource,
+          trang_thai: invStatusMap[formStatus] || 'newlead',
+          user_agent: { assignedTo: formAssignedTo, notes: formNotes, company: formCompany },
+        };
+        await submitContact(payload);
+      } else {
+        const payload: any = {
+          ho_va_ten: formName.trim(),
+          email: formEmail.trim().toLowerCase(),
+          so_dien_thoai: formPhone.trim(),
+          trang_nhan_lead: formSource,
+          trang_thai: invStatusMap[formStatus] || 'newlead',
+          user_agent: { assignedTo: formAssignedTo, notes: formNotes, company: formCompany },
+        };
+        await updateContact(selectedLead.id, payload);
+      }
+      setShowFormModal(false);
+      setSelectedLead(null);
+      await fetchLeads();
+    } catch (err) {
+      console.error('Save lead failed', err);
+    }
   };
 
-  const handleConfirmDelete = () => {
-    console.log('Deleting lead:', selectedLead);
-    setSelectedLead(null);
+  const handleConfirmDelete = async () => {
+    try {
+      if (selectedLead?.id) {
+        await deleteContact(selectedLead.id);
+        setSelectedLead(null);
+        setShowDeleteModal(false);
+        await fetchLeads();
+      }
+    } catch (err) {
+      console.error('Delete lead failed', err);
+    }
   };
 
   return (
@@ -93,7 +229,7 @@ export default function LeadManagement() {
           <div key={status} className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
             <p className="text-gray-600 text-sm mb-1">{getStatusLabel(status)}</p>
             <p className="text-3xl font-bold text-gray-900">
-              {mockLeads.filter(l => l.status === status).length}
+              {leads.filter((l) => l.status === status).length}
             </p>
           </div>
         ))}
@@ -107,13 +243,13 @@ export default function LeadManagement() {
               type="text"
               placeholder="Tìm kiếm theo tên, email..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
             className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">Tất cả trạng thái</option>
@@ -220,6 +356,40 @@ export default function LeadManagement() {
             </tbody>
           </table>
         </div>
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mt-4">
+          <div className="text-sm text-gray-600">
+            Hiển thị {Math.min((page - 1) * perPage + 1, totalItems)}–{Math.min(page * perPage, totalItems)} trên {totalItems} • Trang {page}/{totalPages}
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Hiển thị mỗi trang</label>
+            <select
+              value={perPage}
+              onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <div className="flex items-center gap-2">
+              <button
+                className="px-3 py-2 border rounded-lg disabled:opacity-50"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={loading || page <= 1}
+              >
+                Trước
+              </button>
+              <button
+                className="px-3 py-2 border rounded-lg disabled:opacity-50"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={loading || page >= totalPages}
+              >
+                Sau
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <Modal
@@ -236,7 +406,9 @@ export default function LeadManagement() {
               </label>
               <input
                 type="text"
-                defaultValue={selectedLead?.name}
+                defaultValue={undefined}
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Nguyễn Văn A"
               />
@@ -247,7 +419,9 @@ export default function LeadManagement() {
               </label>
               <input
                 type="email"
-                defaultValue={selectedLead?.email}
+                defaultValue={undefined}
+                value={formEmail}
+                onChange={(e) => setFormEmail(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="email@example.com"
               />
@@ -259,7 +433,9 @@ export default function LeadManagement() {
               <label className="block text-sm font-bold text-gray-700 mb-2">Số điện thoại</label>
               <input
                 type="text"
-                defaultValue={selectedLead?.phone}
+                defaultValue={undefined}
+                value={formPhone}
+                onChange={(e) => setFormPhone(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="0901234567"
               />
@@ -268,7 +444,9 @@ export default function LeadManagement() {
               <label className="block text-sm font-bold text-gray-700 mb-2">Công ty</label>
               <input
                 type="text"
-                defaultValue={selectedLead?.company}
+                defaultValue={undefined}
+                value={formCompany}
+                onChange={(e) => setFormCompany(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Tên công ty"
               />
@@ -279,7 +457,9 @@ export default function LeadManagement() {
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Nguồn</label>
               <select
-                defaultValue={selectedLead?.source}
+                defaultValue={undefined}
+                value={formSource}
+                onChange={(e) => setFormSource(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="contact-form">Contact Form</option>
@@ -291,7 +471,9 @@ export default function LeadManagement() {
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Trạng thái</label>
               <select
-                defaultValue={selectedLead?.status}
+                defaultValue={undefined}
+                value={formStatus}
+                onChange={(e) => setFormStatus(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="new">Mới</option>
@@ -306,7 +488,9 @@ export default function LeadManagement() {
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Phụ trách</label>
             <select
-              defaultValue={selectedLead?.assignedTo}
+              defaultValue={undefined}
+              value={formAssignedTo}
+              onChange={(e) => setFormAssignedTo(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Chưa gán</option>
@@ -319,7 +503,9 @@ export default function LeadManagement() {
             <label className="block text-sm font-bold text-gray-700 mb-2">Ghi chú</label>
             <textarea
               rows={4}
-              defaultValue={selectedLead?.notes}
+              defaultValue={undefined}
+              value={formNotes}
+              onChange={(e) => setFormNotes(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="Ghi chú về lead..."
             />

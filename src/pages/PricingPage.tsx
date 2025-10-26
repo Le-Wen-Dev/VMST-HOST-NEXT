@@ -1,6 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
-import { wordpressPlans, businessPlans, emailPlans, HostingPlan } from '../data/mockData';
+import { listProducts } from '../services/products';
+
+// Define local HostingPlan type to remove dependency on demo mockData
+interface HostingPlan {
+  id: string;
+  name: string;
+  type: 'wordpress' | 'business' | 'email';
+  storage: string;
+  bandwidth: string;
+  websites: number;
+  emails?: number;
+  ssl: boolean;
+  backup: string;
+  support: string;
+  sla: string;
+  price: { monthly: number; quarterly: number; yearly: number };
+  features: string[];
+  recommended: boolean;
+}
 
 interface PricingPageProps {
   onNavigate: (page: string) => void;
@@ -10,23 +28,72 @@ interface PricingPageProps {
 export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProps) {
   const [duration, setDuration] = useState<'monthly' | 'quarterly' | 'yearly'>('yearly');
   const [category, setCategory] = useState<'all' | 'wordpress' | 'business' | 'email'>('all');
+  const [dynamicPlans, setDynamicPlans] = useState<HostingPlan[]>([]);
+
+  useEffect(() => {
+    const normalizeCategory = (dm: string): 'wordpress' | 'business' | 'email' => {
+      const s = (dm || '').toLowerCase().trim();
+      if (s.includes('wordpress') || s.includes('wp')) return 'wordpress';
+      if (s.includes('email') || s.includes('mail')) return 'email';
+      if (s.includes('vps') || s.includes('server') || s.includes('cloud')) return 'business';
+      // default to business (VPS/hosting chung)
+      return 'business';
+    };
+
+    const loadProducts = async () => {
+      try {
+        const res = await listProducts({ perPage: 50, status: 'active' });
+        const mapped: HostingPlan[] = (res.items || []).map((r: any) => {
+          const thongSo = r.thong_so || {};
+          const gia = parseInt(r.gia_ban || '0');
+          const type = normalizeCategory(r.danh_muc || '');
+          const features = Array.isArray(r.tinh_nang) ? r.tinh_nang : [];
+          // Enrich features from common spec keys
+          if (thongSo['Core']) features.push(`Core: ${thongSo['Core']}`);
+          if (thongSo['RAM']) features.push(`RAM: ${thongSo['RAM']}`);
+          if (thongSo['DBs']) features.push(`DBs: ${thongSo['DBs']}`);
+          if (thongSo['Network']) features.push(`Network: ${thongSo['Network']}`);
+          if (thongSo['Network Mbps']) features.push(`Network: ${thongSo['Network Mbps']} Mbps`);
+
+          const storage = thongSo['Dung lượng'] || thongSo['DL'] || thongSo['Storage'] || '';
+          const bandwidth = thongSo['Băng thông'] || thongSo['BW'] || thongSo['Bandwidth'] || '';
+          const websites = parseInt(thongSo['Domains'] || thongSo['Websites'] || '0') || 0;
+          const emails = thongSo['Email'] ? (parseInt(thongSo['Email']) || undefined) : undefined;
+
+          return {
+            id: r.id,
+            name: r.ten_san_pham || 'Sản phẩm',
+            type,
+            storage,
+            bandwidth,
+            websites,
+            emails,
+            ssl: true,
+            backup: 'Hằng ngày',
+            support: '24/7',
+            sla: '99.9%',
+            price: { monthly: gia, quarterly: gia, yearly: gia },
+            features,
+            recommended: false,
+          } as HostingPlan;
+        });
+        setDynamicPlans(mapped);
+      } catch (err) {
+        // Silent fail: no fallback to demo data
+        setDynamicPlans([]);
+      }
+    };
+    loadProducts();
+  }, []);
 
   const getPriceByDuration = (plan: HostingPlan) => {
     return plan.price[duration];
   };
 
   const filteredPlans = () => {
-    let plans: HostingPlan[] = [];
-    if (category === 'all') {
-      plans = [...wordpressPlans, ...businessPlans, ...emailPlans];
-    } else if (category === 'wordpress') {
-      plans = wordpressPlans;
-    } else if (category === 'business') {
-      plans = businessPlans;
-    } else {
-      plans = emailPlans;
-    }
-    return plans;
+    if (dynamicPlans.length === 0) return [];
+    if (category === 'all') return dynamicPlans;
+    return dynamicPlans.filter(p => p.type === (category === 'wordpress' ? 'wordpress' : category === 'email' ? 'email' : 'business'));
   };
 
   return (
@@ -61,7 +128,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
                   : 'bg-white text-gray-700 hover:bg-gray-100'
               }`}
             >
-              WordPress
+              Wordpress max speed
             </button>
             <button
               onClick={() => setCategory('business')}
@@ -71,7 +138,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
                   : 'bg-white text-gray-700 hover:bg-gray-100'
               }`}
             >
-              Business
+              VPS
             </button>
             <button
               onClick={() => setCategory('email')}
@@ -119,93 +186,98 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPlans().map((plan) => (
-            <div
-              key={plan.id}
-              className={`bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 ${
-                plan.recommended ? 'border-2 border-[#034CC9] relative' : ''
-              }`}
-            >
-              {plan.recommended && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-[#034CC9] text-white px-4 py-1 rounded-full text-xs font-semibold">
-                    Phổ biến
-                  </span>
-                </div>
-              )}
-
-              <div className="mb-4">
-                <span className="text-sm text-gray-500 uppercase tracking-wide">
-                  {plan.type === 'wordpress' ? 'WordPress' : plan.type === 'business' ? 'Business' : 'Email'}
-                </span>
-                <h3 className="text-2xl font-bold text-[#0B2B6F] mt-1">{plan.name}</h3>
-              </div>
-
-              <div className="mb-6">
-                <div className="flex items-baseline">
-                  <span className="text-4xl font-bold text-[#034CC9]">
-                    {getPriceByDuration(plan).toLocaleString('vi-VN')}₫
-                  </span>
-                  <span className="text-gray-500 ml-2 text-sm">
-                    /{duration === 'monthly' ? 'tháng' : duration === 'quarterly' ? '3 tháng' : 'năm'}
-                  </span>
-                </div>
-              </div>
-
-              <ul className="space-y-3 mb-6">
-                <li className="flex items-center text-sm">
-                  <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                  <span className="text-gray-700">{plan.storage} Storage</span>
-                </li>
-                <li className="flex items-center text-sm">
-                  <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                  <span className="text-gray-700">{plan.bandwidth} Bandwidth</span>
-                </li>
-                {plan.websites > 0 && (
-                  <li className="flex items-center text-sm">
-                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                    <span className="text-gray-700">{plan.websites} Websites</span>
-                  </li>
-                )}
-                {plan.emails !== undefined && (
-                  <li className="flex items-center text-sm">
-                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                    <span className="text-gray-700">{plan.emails} Email Accounts</span>
-                  </li>
-                )}
-                <li className="flex items-center text-sm">
-                  <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                  <span className="text-gray-700">SLA {plan.sla}</span>
-                </li>
-                <li className="flex items-center text-sm">
-                  <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                  <span className="text-gray-700">{plan.backup}</span>
-                </li>
-              </ul>
-
-              <button
-                onClick={() => onAddToCart(plan, duration)}
-                className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-                  plan.recommended
-                    ? 'bg-[#034CC9] text-white hover:bg-[#0B2B6F]'
-                    : 'bg-gray-100 text-[#034CC9] hover:bg-gray-200'
+        {filteredPlans().length === 0 ? (
+          <div className="bg-white rounded-xl shadow-md p-8 text-center">
+            <h2 className="text-2xl font-bold text-[#0B2B6F] mb-2">Chưa có sản phẩm</h2>
+            <p className="text-gray-600">Vui lòng quay lại sau hoặc liên hệ hỗ trợ để được tư vấn.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPlans().map((plan) => (
+              <div
+                key={plan.id}
+                className={`bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 ${
+                  plan.recommended ? 'border-2 border-[#034CC9] relative' : ''
                 }`}
               >
-                Chọn gói
-              </button>
-            </div>
-          ))}
-        </div>
+                {plan.recommended && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-[#034CC9] text-white px-4 py-1 rounded-full text-xs font-semibold">
+                      Phổ biến
+                    </span>
+                  </div>
+                )}
 
-        <div className="mt-12 text-center bg-white rounded-xl shadow-md p-8">
-          <h2 className="text-2xl font-bold text-[#0B2B6F] mb-4">Không biết chọn gói nào?</h2>
-          <p className="text-gray-600 mb-6">
-            Sử dụng công cụ tư vấn của chúng tôi để tìm gói phù hợp nhất
-          </p>
+                <div className="mb-4">
+                  <span className="text-sm text-gray-500 uppercase tracking-wide">
+                    {plan.type === 'wordpress' ? 'Wordpress max speed' : plan.type === 'business' ? 'VPS' : 'Email'}
+                  </span>
+                  <h3 className="text-2xl font-bold text-[#0B2B6F] mt-1">{plan.name}</h3>
+                </div>
+
+                <div className="mb-6">
+                  <div className="flex items-baseline">
+                    <span className="text-4xl font-bold text-[#034CC9]">
+                      {getPriceByDuration(plan).toLocaleString('vi-VN')}₫
+                    </span>
+                    <span className="text-gray-500 ml-2 text-sm">
+                      /{duration === 'monthly' ? 'tháng' : duration === 'quarterly' ? '3 tháng' : 'năm'}
+                    </span>
+                  </div>
+                </div>
+
+                <ul className="space-y-3 mb-6">
+                  <li className="flex items-center text-sm">
+                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                    <span className="text-gray-700">{plan.storage} Storage</span>
+                  </li>
+                  <li className="flex items-center text-sm">
+                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                    <span className="text-gray-700">{plan.bandwidth} Bandwidth</span>
+                  </li>
+                  {plan.websites > 0 && (
+                    <li className="flex items-center text-sm">
+                      <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                      <span className="text-gray-700">{plan.websites} Websites</span>
+                    </li>
+                  )}
+                  {plan.emails !== undefined && (
+                    <li className="flex items-center text-sm">
+                      <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                      <span className="text-gray-700">{plan.emails} Email Accounts</span>
+                    </li>
+                  )}
+                  <li className="flex items-center text-sm">
+                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                    <span className="text-gray-700">SLA {plan.sla}</span>
+                  </li>
+                  <li className="flex items-center text-sm">
+                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                    <span className="text-gray-700">{plan.backup}</span>
+                  </li>
+                </ul>
+
+                <button
+                  onClick={() => onAddToCart(plan, duration)}
+                  className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+                    plan.recommended
+                      ? 'bg-[#034CC9] text-white hover:bg-[#0B2B6F]'
+                      : 'bg-white text-[#034CC9] border-2 border-[#034CC9] hover:bg-blue-50'
+                  }`}
+                >
+                  Chọn gói
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-12 bg-white rounded-xl shadow-md p-8 text-center">
+          <h3 className="text-xl font-bold text-[#0B2B6F] mb-2">Không biết chọn gói nào?</h3>
+          <p className="text-gray-600 mb-6">Sử dụng công cụ tư vấn của chúng tôi để tìm gói phù hợp nhất</p>
           <button
             onClick={() => onNavigate('advisor')}
-            className="bg-[#034CC9] text-white px-8 py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
+            className="bg-[#034CC9] text-white px-8 py-3 rounded-lg hover:bg-[#0B2B6F] transition-colors"
           >
             Tư vấn chọn gói
           </button>

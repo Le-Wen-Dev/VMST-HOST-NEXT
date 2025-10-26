@@ -1,17 +1,41 @@
 import { useState } from 'react';
 import { Mail, Phone, MapPin, MessageSquare } from 'lucide-react';
+import { submitContact, fetchClientIp } from '../services/contacts';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setFormData({ name: '', email: '', phone: '', message: '' });
-      setSubmitted(false);
-    }, 3000);
+    try {
+      setSubmitting(true);
+      const ip = await fetchClientIp();
+      const payload = {
+        ho_va_ten: formData.name?.trim(),
+        email: formData.email?.trim().toLowerCase(),
+        so_dien_thoai: formData.phone?.trim(),
+        trang_nhan_lead: `contact_page${formData.message ? ' | ' + formData.message : ''}`,
+        trang_thai: 'newlead',
+        ip_adress: ip,
+        user_agent: { ua: navigator.userAgent },
+      };
+      const record = await submitContact(payload);
+      console.log('Contact created:', record?.id, record);
+      setSubmitted(true);
+      // Clear the form after a short delay (preserve existing UX)
+      setTimeout(() => {
+        setSubmitted(false);
+        setFormData({ name: '', email: '', phone: '', message: '' });
+      }, 2500);
+    } catch (err: any) {
+      console.error('Submit contact failed', err);
+      // Optionally display a toast/error message if the page has such mechanism
+      // showError?.(extractPocketBaseError(err) || 'Gửi liên hệ thất bại, vui lòng thử lại sau');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

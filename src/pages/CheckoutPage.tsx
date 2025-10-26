@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Tag } from 'lucide-react';
 import { HostingPlan, vouchers } from '../data/mockData';
+import { createMyOrder } from '../services/orders';
 
 interface CartItem {
   plan: HostingPlan;
@@ -27,6 +28,8 @@ export default function CheckoutPage({ cart, onClearCart, onNavigate }: Checkout
   const [voucherError, setVoucherError] = useState('');
   const [orderCompleted, setOrderCompleted] = useState(false);
   const [orderId, setOrderId] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
 
@@ -66,11 +69,34 @@ export default function CheckoutPage({ cart, onClearCart, onNavigate }: Checkout
   const discount = calculateDiscount();
   const total = subtotal - discount;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newOrderId = `ORD-${Date.now()}`;
-    setOrderId(newOrderId);
-    setOrderCompleted(true);
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const note = {
+        customer: formData,
+        items: cart.map((c) => ({ name: c.plan.name, duration: c.duration, price: c.price })),
+        voucher: appliedVoucher?.code || null,
+        subtotal,
+        discount,
+        total,
+      };
+      const order = await createMyOrder({
+        gia_tri: `${total.toLocaleString('vi-VN')}₫`,
+        ghi_chu_noi_bo: JSON.stringify(note),
+        // Optionally set san_pham when product ids are available
+        thanh_toan: 'cho_thanh_toan',
+        trang_thai_su_dung: 'dang_su_dung',
+      });
+      setOrderId(order.ma_don_hang || order.id);
+      setOrderCompleted(true);
+      onClearCart();
+    } catch (err: any) {
+      setSubmitError(err?.message || 'Không thể tạo đơn hàng. Vui lòng đăng nhập và thử lại.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (orderCompleted) {
@@ -191,6 +217,9 @@ export default function CheckoutPage({ cart, onClearCart, onNavigate }: Checkout
                   <p className="text-sm text-gray-500 mt-1">Nhập domain bạn muốn sử dụng (không bán domain)</p>
                 </div>
               </div>
+              {submitError && (
+                <div className="mt-4 text-red-600 text-sm">{submitError}</div>
+              )}
             </div>
 
             <div className="bg-white rounded-xl shadow-md p-6">
@@ -259,9 +288,10 @@ export default function CheckoutPage({ cart, onClearCart, onNavigate }: Checkout
 
               <button
                 type="submit"
-                className="w-full bg-[#034CC9] text-white py-4 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
+                disabled={submitting}
+                className="w-full bg-[#034CC9] text-white py-4 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors disabled:opacity-50"
               >
-                Hoàn tất đơn hàng
+                {submitting ? 'Đang xử lý...' : 'Hoàn tất đơn hàng'}
               </button>
 
               <p className="text-xs text-gray-500 mt-4 text-center">

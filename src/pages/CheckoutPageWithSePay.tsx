@@ -4,6 +4,7 @@ import { HostingPlan, vouchers } from '../data/mockData';
 import SePayQRModal from '../components/SePayQRModal';
 import { sePayService } from '../services/sepay';
 import type { PaymentIntent, PaymentMethod } from '../types/payment';
+import { createMyOrder, updateOrder } from '../services/orders';
 
 interface CartItem {
   plan: HostingPlan;
@@ -32,6 +33,8 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
   const [showSePayModal, setShowSePayModal] = useState(false);
   const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [orderRecordId, setOrderRecordId] = useState<string | null>(null);
+  const [orderCode, setOrderCode] = useState<string | null>(null);
 
   const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
 
@@ -84,13 +87,24 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
     setIsProcessing(true);
 
     try {
-      const orderId = `ORD-${Date.now()}`;
+      // 1) Tạo đơn hàng trên hệ thống trước khi tạo QR
+      const createdOrder = await createMyOrder({
+        gia_tri: String(total),
+        thanh_toan: 'cho_thanh_toan',
+        trang_thai_su_dung: 'tat_tam_thoi',
+        ghi_chu_noi_bo: `Khách: ${formData.name} | Email: ${formData.email} | Phone: ${formData.phone} | Domain: ${formData.domain || ''}`
+      });
 
+      const orderId = createdOrder.ma_don_hang || createdOrder.id;
+      setOrderRecordId(createdOrder.id);
+      setOrderCode(orderId);
+
+      // 2) Tạo payment intent với SePay
       const sePayResponse = await sePayService.createPayment({
         orderId,
         amount: total,
         description: `Thanh toán đơn hàng ${orderId} - ${formData.name}`,
-        returnUrl: `${window.location.origin}/order-confirmation?orderId=${orderId}`,
+        returnUrl: `${window.location.origin}/?page=my-orders`,
         callbackUrl: `${window.location.origin}/api/payments/webhook`,
         expiresIn: 15 * 60
       });
@@ -137,10 +151,20 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
     }
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
     setShowSePayModal(false);
+
+    // 3) Cập nhật trạng thái đơn hàng => đã thanh toán
+    try {
+      if (orderRecordId) {
+        await updateOrder(orderRecordId, { thanh_toan: 'da_thanh_toan', trang_thai_su_dung: 'dang_su_dung' });
+      }
+    } catch (err) {
+      console.error('Không thể cập nhật trạng thái đơn hàng sau thanh toán:', err);
+    }
+
     onClearCart();
-    onNavigate(`order-confirmation`);
+    onNavigate('my-orders');
   };
 
   const handleRegenerateQR = async () => {

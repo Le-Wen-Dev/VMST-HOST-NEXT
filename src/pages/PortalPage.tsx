@@ -1,5 +1,6 @@
 import { Server, Calendar, AlertCircle, User, ShoppingBag, MessageSquare, LogOut, Key } from 'lucide-react';
-import { mockServices } from '../data/mockData';
+// Xoá gói data demo
+const mockServices: any[] = [];
 
 interface PortalPageProps {
   onNavigate: (page: string) => void;
@@ -103,7 +104,7 @@ export default function PortalPage({ onNavigate, onLogout }: PortalPageProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm mb-1">Sắp hết hạn</p>
-                <p className="text-3xl font-bold text-orange-500">1</p>
+                <p className="text-3xl font-bold text-orange-500">0</p>
               </div>
               <div className="bg-orange-100 p-3 rounded-lg">
                 <Calendar className="h-8 w-8 text-orange-500" />

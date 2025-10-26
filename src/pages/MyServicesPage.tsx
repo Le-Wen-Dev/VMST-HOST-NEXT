@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Server, ExternalLink, Mail, Copy, CheckCircle, Calendar, Cpu, HardDrive, Database } from 'lucide-react';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
+import { useEffect, useState } from 'react';
+import { Server, ExternalLink, Mail, Copy, CheckCircle, Calendar, Cpu, HardDrive, Database, ChevronLeft } from 'lucide-react';
+
+import { listMyOrders } from '../services/orders';
 
 interface Service {
   id: string;
@@ -22,6 +22,63 @@ interface Service {
 
 export default function MyServicesPage({ onNavigate }: { onNavigate: (page: string) => void }) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    listMyOrders({ page: 1, perPage: 50, expand: 'san_pham' })
+      .then((res) => {
+        const mapped: Service[] = res.items.map((o: any) => {
+          const sanPham = o.expand?.san_pham || {};
+          const specsSrc = sanPham?.thong_so || {};
+          const findSpec = (candidates: string[]) => {
+            try {
+              const keys = Object.keys(specsSrc || {});
+              for (const c of candidates) {
+                const k = keys.find((kk) => kk.toLowerCase() === c.toLowerCase());
+                if (k) return String(specsSrc[k]);
+              }
+            } catch {}
+            return '-';
+          };
+          const statusMap: Record<string, 'active' | 'expired' | 'suspended'> = {
+            dang_su_dung: 'active',
+            tat_tam_thoi: 'suspended',
+            het_han_su_dung: 'expired',
+            bi_khoa_vinh_vien: 'suspended',
+          };
+          return {
+            id: o.id,
+            productName: sanPham?.ten_san_pham || 'Dịch vụ',
+            panelUrl: o.host_url || '',
+            username: o.host_username || '',
+            password: o.host_password || '',
+            status: statusMap[o.trang_thai_su_dung || 'tat_tam_thoi'] || 'suspended',
+            startDate: (o.created || '').split('T')[0] || '',
+            expiryDate: (o.ngay_het_han || '').split('T')[0] || '',
+            specs: {
+              cpu: findSpec(['cpu', 'CPU']),
+              ram: findSpec(['ram', 'RAM']),
+              storage: findSpec(['storage', 'dung_luong', 'Storage']),
+              bandwidth: findSpec(['bandwidth', 'băng thông', 'Bandwidth']),
+            },
+          } as Service;
+        });
+        if (mounted) setServices(mapped);
+      })
+      .catch((e) => {
+        if (mounted) setError(e?.message || String(e));
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const myServices: Service[] = [
     {
@@ -110,18 +167,46 @@ export default function MyServicesPage({ onNavigate }: { onNavigate: (page: stri
     return labels[status as keyof typeof labels];
   };
 
+  const servicesToShow = services.length ? services : myServices;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Header onNavigate={onNavigate} />
+      {/* Removed duplicate Header - App already renders a global Header */}
 
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <button
+              onClick={() => { if (window.history.length > 1) window.history.back(); else onNavigate('portal'); }}
+              className="inline-flex items-center gap-2 text-sm text-gray-700 hover:text-[#034CC9]"
+            >
+              <ChevronLeft className="h-5 w-5" /> Quay lại
+            </button>
+          </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Dịch vụ của tôi</h1>
           <p className="text-gray-600">Quản lý và truy cập các dịch vụ hosting đã đăng ký</p>
         </div>
 
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">
+            Không thể tải dịch vụ: {error}
+          </div>
+        )}
+
+        {loading && (
+          <div className="mb-6 p-4 bg-blue-50 text-blue-700 rounded-lg border border-blue-200">
+            Đang tải dịch vụ...
+          </div>
+        )}
+
+        {!loading && !error && servicesToShow.length === 0 && (
+          <div className="mb-6 p-4 bg-gray-50 text-gray-700 rounded-lg border border-gray-200">
+            Bạn chưa có dịch vụ nào.
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-6">
-          {myServices.map((service) => (
+          {servicesToShow.map((service: Service) => (
             <div key={service.id} className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-gray-100 hover:border-blue-300 transition-all">
               <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-6">
                 <div className="flex justify-between items-start">
@@ -292,7 +377,7 @@ export default function MyServicesPage({ onNavigate }: { onNavigate: (page: stri
         </div>
       </div>
 
-      <Footer onNavigate={onNavigate} />
+      {/* Removed duplicate Footer - App already renders a global Footer */}
     </div>
   );
 }

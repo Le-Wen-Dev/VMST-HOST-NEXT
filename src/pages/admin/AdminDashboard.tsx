@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { LayoutDashboard, ShoppingBag, Server, Ticket, LogOut, Users, FileText, Tag, Settings as SettingsIcon, MessageSquare, Clock, UserPlus, AlertTriangle, Link2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { LayoutDashboard, ShoppingBag, Server, Ticket, LogOut, Users, FileText, Tag, Settings as SettingsIcon, MessageSquare, Clock, UserPlus, AlertTriangle, Link2, Package } from 'lucide-react';
 import { mockOrders, mockServers, vouchers, mockTickets } from '../../data/mockData';
 import LeadManagement from './modules/LeadManagement';
 import ServerManagement from './modules/ServerManagement';
@@ -10,6 +10,8 @@ import AffiliateManagement from './modules/AffiliateManagement';
 import Settings from './modules/Settings';
 import ExpirationAlerts from './modules/ExpirationAlerts';
 import { ToastContainer } from '../../components/Toast';
+import ProductManagement from './modules/ProductManagement'
+import TicketManagement from './modules/TicketManagement'
 
 interface AdminDashboardProps {
   onNavigate: (page: string) => void;
@@ -19,6 +21,27 @@ interface AdminDashboardProps {
 export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [toasts, setToasts] = useState<Array<{ id: string; type: 'success' | 'error' | 'warning' | 'info'; message: string }>>([]);
+
+  // Sync activeTab with URL path: /admin, /admin/orders, ...
+  useEffect(() => {
+    const applyPathToTab = () => {
+      const path = window.location.pathname;
+      if (!path.startsWith('/admin')) return;
+      const seg = path.replace(/^\/admin\/?/, '');
+      setActiveTab(seg || 'dashboard');
+    };
+    applyPathToTab();
+    const onPop = () => applyPathToTab();
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const navigateTab = (id: string) => {
+    const newPath = id === 'dashboard' ? '/admin' : `/admin/${id}`;
+    // pushState without reload
+    window.history.pushState({}, '', newPath);
+    setActiveTab(id);
+  };
 
   const addToast = (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
     const id = Date.now().toString();
@@ -33,6 +56,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'orders', label: 'Đơn hàng', icon: ShoppingBag },
     { id: 'leads', label: 'Leads', icon: UserPlus },
+    { id: 'products', label: 'Sản phẩm', icon: Package },
     { id: 'servers', label: 'Servers', icon: Server },
     { id: 'expiration', label: 'Cảnh báo hết hạn', icon: AlertTriangle },
     { id: 'affiliate', label: 'Affiliate', icon: Link2 },
@@ -464,6 +488,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         return <OrderManagement />;
       case 'leads':
         return <LeadManagement />;
+      case 'products':
+        return <ProductManagement />;
       case 'servers':
         return <ServerManagement />;
       case 'expiration':
@@ -471,7 +497,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       case 'affiliate':
         return <AffiliateManagement />;
       case 'tickets':
-        return renderTickets();
+        return <TicketManagement />;
       case 'vouchers':
         return renderVouchers();
       case 'blog':
@@ -506,7 +532,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => navigateTab(item.id)}
                 className={`w-full flex items-center px-4 py-3 rounded-xl mb-1 transition-all duration-200 ${
                   activeTab === item.id
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/50 scale-105'

@@ -1,6 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Lightbulb, ArrowRight, Check } from 'lucide-react';
-import { wordpressPlans, businessPlans, HostingPlan } from '../data/mockData';
+import { listProducts } from '../services/products';
+
+// Define local HostingPlan type to remove dependency on demo mockData
+interface HostingPlan {
+  id: string;
+  name: string;
+  type: 'wordpress' | 'business' | 'email';
+  storage: string;
+  bandwidth: string;
+  websites: number;
+  emails?: number;
+  ssl: boolean;
+  backup: string;
+  support: string;
+  sla: string;
+  price: { monthly: number; quarterly: number; yearly: number };
+  features: string[];
+  recommended: boolean;
+}
 
 interface AdvisorPageProps {
   onNavigate: (page: string) => void;
@@ -14,6 +32,48 @@ export default function AdvisorPage({ onNavigate, onAddToCart }: AdvisorPageProp
   const [planType, setPlanType] = useState<'wordpress' | 'business' | 'unsure'>('unsure');
   const [recommendation, setRecommendation] = useState<HostingPlan | null>(null);
   const [reasons, setReasons] = useState<string[]>([]);
+  const [dynamicPlans, setDynamicPlans] = useState<HostingPlan[]>([]);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        const res = await listProducts({ perPage: 50, status: 'active' });
+        const mapped: HostingPlan[] = (res.items || []).map((r: any) => {
+          const thongSo = r.thong_so || {};
+          const gia = parseInt(r.gia_ban || '0');
+          const dm: string = (r.danh_muc || '').trim();
+          let type: 'wordpress' | 'business' | 'email' = 'business';
+          if (dm.toLowerCase() === 'wordpress max speed') type = 'wordpress';
+          else if (dm.toLowerCase() === 'email') type = 'email';
+          else type = 'business'; // VPS
+          const features = Array.isArray(r.tinh_nang) ? r.tinh_nang : [];
+          if (thongSo['Core']) features.push(`Core: ${thongSo['Core']}`);
+          if (thongSo['RAM']) features.push(`RAM: ${thongSo['RAM']}`);
+          if (thongSo['Network Mbps']) features.push(`Network: ${thongSo['Network Mbps']} Mbps`);
+          return {
+            id: r.id,
+            name: r.ten_san_pham || 'Sản phẩm',
+            type,
+            storage: thongSo['Dung lượng'] || '',
+            bandwidth: thongSo['Băng thông'] || '',
+            websites: parseInt(thongSo['Domains'] || '0') || 0,
+            emails: thongSo['Email'] ? (parseInt(thongSo['Email']) || undefined) : undefined,
+            ssl: true,
+            backup: 'Hằng ngày',
+            support: '24/7',
+            sla: '99.9%',
+            price: { monthly: gia, quarterly: gia, yearly: gia },
+            features,
+            recommended: false,
+          } as HostingPlan;
+        });
+        setDynamicPlans(mapped);
+      } catch (err) {
+        setDynamicPlans([]);
+      }
+    };
+    loadProducts();
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +85,16 @@ export default function AdvisorPage({ onNavigate, onAddToCart }: AdvisorPageProp
     let recommendedPlan: HostingPlan | null = null;
     const recommendationReasons: string[] = [];
 
-    const plans = planType === 'business' ? businessPlans : wordpressPlans;
+    const sourcePlans = dynamicPlans.length > 0 ? dynamicPlans : [];
+    const plans = (planType === 'business')
+      ? sourcePlans.filter(p => p.type === 'business')
+      : sourcePlans.filter(p => p.type === 'wordpress');
+
+    if (plans.length === 0) {
+      setRecommendation(null);
+      setReasons(['Chưa có dữ liệu sản phẩm để tư vấn. Vui lòng quay lại sau.']);
+      return;
+    }
 
     for (const plan of plans) {
       const planStorage = parseInt(plan.storage);
@@ -53,14 +122,16 @@ export default function AdvisorPage({ onNavigate, onAddToCart }: AdvisorPageProp
     }
 
     if (!recommendedPlan) {
-      recommendedPlan = plans.find(p => p.recommended) || plans[2];
-      recommendationReasons.push('Gói Pro phù hợp với hầu hết doanh nghiệp SME');
-      recommendationReasons.push('Cân bằng tốt giữa hiệu năng và chi phí');
-      recommendationReasons.push('Đủ headroom cho tăng trưởng trong tương lai');
+      // Pick a reasonable default (first plan of selected category)
+      recommendedPlan = plans[0] || null;
+      if (recommendedPlan) {
+        recommendationReasons.push('Gợi ý dựa trên loại gói bạn đã chọn');
+        recommendationReasons.push('Cân bằng tốt giữa hiệu năng và chi phí');
+      }
     }
 
     setRecommendation(recommendedPlan);
-    setReasons(recommendationReasons);
+    setReasons(recommendationReasons.length > 0 ? recommendationReasons : ['Chưa có gợi ý chi tiết']);
   };
 
   return (
@@ -185,7 +256,7 @@ export default function AdvisorPage({ onNavigate, onAddToCart }: AdvisorPageProp
           </form>
         </div>
 
-        {recommendation && (
+        {recommendation ? (
           <div className="bg-white rounded-2xl shadow-lg p-8 border-2 border-[#034CC9]">
             <div className="flex items-center mb-6">
               <div className="bg-green-100 p-3 rounded-full">
@@ -221,39 +292,35 @@ export default function AdvisorPage({ onNavigate, onAddToCart }: AdvisorPageProp
                   <p className="text-sm text-gray-600 mb-1">Websites</p>
                   <p className="text-lg font-semibold text-[#0B2B6F]">{recommendation.websites}</p>
                 </div>
-                <div className="bg-white p-4 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">SLA</p>
-                  <p className="text-lg font-semibold text-[#0B2B6F]">{recommendation.sla}</p>
-                </div>
+                {recommendation.emails !== undefined && (
+                  <div className="bg-white p-4 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-1">Email Accounts</p>
+                    <p className="text-lg font-semibold text-[#0B2B6F]">{recommendation.emails}</p>
+                  </div>
+                )}
               </div>
-            </div>
 
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-[#0B2B6F] mb-4">Tại sao gói này phù hợp?</h3>
-              <ul className="space-y-3">
-                {reasons.map((reason, idx) => (
-                  <li key={idx} className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700">{reason}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-4">
               <button
-                onClick={() => onAddToCart(recommendation, 'yearly')}
-                className="bg-[#034CC9] text-white py-4 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
+                onClick={() => onAddToCart(recommendation!, 'monthly')}
+                className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
               >
                 Chọn gói này
               </button>
-              <button
-                onClick={() => onNavigate(recommendation.type === 'wordpress' ? 'wordpress-hosting' : 'business-hosting')}
-                className="bg-white text-[#034CC9] border-2 border-[#034CC9] py-4 rounded-lg font-semibold hover:bg-[#E6EEFF] transition-colors"
-              >
-                Xem gói khác
-              </button>
             </div>
+
+            <div>
+              <h3 className="text-xl font-bold text-[#0B2B6F] mb-3">Lý do gợi ý</h3>
+              <ul className="list-disc ml-5 text-gray-700 space-y-2">
+                {reasons.map((r, idx) => (
+                  <li key={idx}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-lg p-8">
+            <h2 className="text-xl font-bold text-[#0B2B6F] mb-2">Chưa có dữ liệu sản phẩm để gợi ý</h2>
+            <p className="text-gray-600">Vui lòng vào trang Bảng giá để xem các sản phẩm hiện có.</p>
           </div>
         )}
       </div>

@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { Zap, Shield, Clock, Headphones, Server, Mail, Globe, ArrowRight, Check } from 'lucide-react';
-import { wordpressPlans, businessPlans, emailPlans, blogPosts } from '../data/mockData';
+import { blogPosts } from '../data/mockData';
+import { listProducts, ProductRecord } from '../services/products';
 
 interface HomePageProps {
   onNavigate: (page: string, params?: any) => void;
@@ -7,11 +9,83 @@ interface HomePageProps {
 }
 
 export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
-  const featuredPlans = [
-    { ...wordpressPlans.find(p => p.id === 'wp-pro')!, category: 'wordpress-hosting' },
-    { ...businessPlans.find(p => p.id === 'biz-pro')!, category: 'business-hosting' },
-    { ...emailPlans.find(p => p.id === 'mail-pro')!, category: 'email-domain' }
-  ];
+  const [activeTab, setActiveTab] = useState<'wordpress' | 'vps' | 'email'>('wordpress');
+  const [wpProducts, setWpProducts] = useState<ProductRecord[]>([]);
+  const [vpsProducts, setVpsProducts] = useState<ProductRecord[]>([]);
+  const [emailProducts, setEmailProducts] = useState<ProductRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await listProducts({ status: 'active', perPage: 50 });
+        const items = res.items || [];
+        const norm = (s: any) => String(s || '').toLowerCase();
+        const wp = items.filter(i => norm(i.danh_muc).includes('wordpress'));
+        const vps = items.filter(i => {
+          const c = norm(i.danh_muc);
+          return c.includes('vps') || c.includes('business') || c.includes('nvme') || c.includes('platinum');
+        });
+        const em = items.filter(i => norm(i.danh_muc).includes('email'));
+        if (!mounted) return;
+        setWpProducts(wp.slice(0, 3));
+        setVpsProducts(vps.slice(0, 3));
+        setEmailProducts(em.slice(0, 3));
+      } catch (err) {
+        console.warn('Lỗi tải sản phẩm:', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const getTabProducts = () => {
+    if (activeTab === 'wordpress') return wpProducts;
+    if (activeTab === 'vps') return vpsProducts;
+    return emailProducts;
+  };
+
+  const placeholderNames: Record<'wordpress' | 'vps' | 'email', string[]> = {
+    wordpress: ['gói 1 wordpress', 'gói 2 wordpress', 'gói 3 wordpress'],
+    vps: ['Gói số 1 VPS NVME', 'gói số 2 VPS NVME', 'gói số  3 NVME'],
+    email: ['gói 1 Email', 'gói 2 email', 'gói 3 email'],
+  };
+
+  const extractFeatures = (prod: ProductRecord): string[] => {
+    const toArray = (val: any): string[] => {
+      if (!val) return [];
+      try {
+        // If stored as JSON string
+        if (typeof val === 'string') {
+          const parsed = JSON.parse(val);
+          if (Array.isArray(parsed)) {
+            return parsed.map((v) => String(v));
+          }
+          if (typeof parsed === 'object' && parsed) {
+            return Object.entries(parsed).map(([k, v]) => `${k}: ${v}`);
+          }
+          // Fallback: split by newline/comma
+          return String(val).split(/\n|,/).map((s) => s.trim()).filter(Boolean);
+        }
+        if (Array.isArray(val)) return val.map((v) => String(v));
+        if (typeof val === 'object' && val) return Object.entries(val).map(([k, v]) => `${k}: ${v}`);
+      } catch {
+        return String(val).split(/\n|,/).map((s) => s.trim()).filter(Boolean);
+      }
+      return [];
+    };
+
+    const features = [
+      ...toArray((prod as any).tinh_nang),
+      ...toArray((prod as any).thong_so),
+    ];
+    // unique & non-empty
+    const unique = Array.from(new Set(features.filter(Boolean)));
+    return unique.slice(0, 6);
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -24,9 +98,9 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+              <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-snug mb-6">
                 Hạ tầng Hosting & Email Doanh nghiệp tối ưu cho WordPress
-              </h1>
+              </h3>
               <p className="text-xl text-blue-100 mb-8 leading-relaxed">
                 OpenLiteSpeed • CloudLinux • Backup hằng ngày • Triển khai tự động • Hỗ trợ thật
               </p>
@@ -98,108 +172,92 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
 
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
+          <div className="text-center mb-6">
             <h2 className="text-3xl sm:text-4xl font-bold text-[#0B2B6F] mb-4">Sản phẩm nổi bật</h2>
             <p className="text-gray-600 text-lg">Lựa chọn hoàn hảo cho doanh nghiệp của bạn</p>
           </div>
 
+          <div className="flex flex-wrap justify-center gap-3 mb-10">
+            <button
+              onClick={() => setActiveTab('wordpress')}
+              className={`px-6 py-2 rounded-full border ${activeTab === 'wordpress' ? 'bg-[#034CC9] text-white border-[#034CC9]' : 'bg-white text-[#0B2B6F] border-gray-200'} transition-colors`}
+            >
+              wordpress max speed
+            </button>
+            <button
+              onClick={() => setActiveTab('vps')}
+              className={`px-6 py-2 rounded-full border ${activeTab === 'vps' ? 'bg-[#034CC9] text-white border-[#034CC9]' : 'bg-white text-[#0B2B6F] border-gray-200'} transition-colors`}
+            >
+              vps NVME Xeon platinum gen 2
+            </button>
+            <button
+              onClick={() => setActiveTab('email')}
+              className={`px-6 py-2 rounded-full border ${activeTab === 'email' ? 'bg-[#034CC9] text-white border-[#034CC9]' : 'bg-white text-[#0B2B6F] border-gray-200'} transition-colors`}
+            >
+              Email doanh nghiệp
+            </button>
+          </div>
+
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all overflow-hidden border-2 border-transparent hover:border-[#034CC9] group">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-8 text-white">
-                <Server className="h-12 w-12 mb-4" />
-                <h3 className="text-2xl font-bold mb-2">WordPress Hosting</h3>
-                <p className="text-blue-100">Tối ưu riêng cho WordPress</p>
-              </div>
-              <div className="p-8">
-                <ul className="space-y-3 mb-6">
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">OpenLiteSpeed & LiteSpeed Cache</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">WordPress Toolkit tích hợp</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">Staging & Clone website dễ dàng</span>
-                  </li>
-                </ul>
-                <button
-                  onClick={() => onNavigate('wordpress-hosting')}
-                  className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors flex items-center justify-center group-hover:scale-105 transition-transform"
-                >
-                  Xem gói
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </button>
-              </div>
-            </div>
+            {getTabProducts().length > 0 ? (
+              getTabProducts().map((prod) => (
+                <div key={prod.id} className="bg-white rounded-2xl shadow-lg p-8 border-2 border-transparent hover:border-[#034CC9] transition-all">
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl font-bold text-[#0B2B6F]">{prod.ten_san_pham}</h3>
+                    <p className="text-gray-600">{(prod.danh_muc || '').toUpperCase()}</p>
+                  </div>
+                  <div className="text-center mb-6">
+                    {prod.gia_ban ? (
+                      <div className="flex items-baseline justify-center">
+                        <span className="text-3xl font-bold text-[#034CC9]">{prod.gia_ban}</span>
+                        <span className="text-gray-500 ml-2">{prod.don_vi || ''}</span>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500">Đang cập nhật giá</p>
+                    )}
+                  </div>
 
-            <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all overflow-hidden border-2 border-transparent hover:border-[#034CC9] group">
-              <div className="bg-gradient-to-br from-green-500 to-green-600 p-8 text-white">
-                <Globe className="h-12 w-12 mb-4" />
-                <h3 className="text-2xl font-bold mb-2">Business Hosting</h3>
-                <p className="text-green-100">Hiệu suất cao cho mọi ứng dụng</p>
-              </div>
-              <div className="p-8">
-                <ul className="space-y-3 mb-6">
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">PHP, Node.js, Python support</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">SSH Access & Git integration</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">Redis Cache & Elasticsearch</span>
-                  </li>
-                </ul>
-                <button
-                  onClick={() => onNavigate('business-hosting')}
-                  className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors flex items-center justify-center group-hover:scale-105 transition-transform"
-                >
-                  Xem gói
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </button>
-              </div>
-            </div>
+                  {/* Tính năng/Thông số hiển thị đẹp như giao diện mẫu */}
+                  {extractFeatures(prod).length > 0 && (
+                    <ul className="space-y-3 mb-6">
+                      {extractFeatures(prod).slice(0,4).map((feature, idx) => (
+                        <li key={idx} className="flex items-start">
+                          <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                          <span className="text-gray-700 text-sm">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
-            <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all overflow-hidden border-2 border-transparent hover:border-[#034CC9] group">
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-8 text-white">
-                <Mail className="h-12 w-12 mb-4" />
-                <h3 className="text-2xl font-bold mb-2">Email Domain</h3>
-                <p className="text-purple-100">Email doanh nghiệp chuyên nghiệp</p>
-              </div>
-              <div className="p-8">
-                <ul className="space-y-3 mb-6">
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">Anti-Spam & Anti-Virus</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">DKIM, SPF & DMARC</span>
-                  </li>
-                  <li className="flex items-start">
-                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700 text-sm">Webmail & ActiveSync</span>
-                  </li>
-                </ul>
-                <button
-                  onClick={() => onNavigate('email-domain')}
-                  className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors flex items-center justify-center group-hover:scale-105 transition-transform"
-                >
-                  Xem gói
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </button>
-              </div>
-            </div>
+                  <button
+                    onClick={() => onNavigate('pricing')}
+                    className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
+                  >
+                    Xem gói
+                  </button>
+                </div>
+              ))
+            ) : (
+              placeholderNames[activeTab].map((name, idx) => (
+                <div key={idx} className="bg-white rounded-2xl shadow-lg p-8 border-2 border-dashed border-gray-200">
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl font-bold text-[#0B2B6F]">{name}</h3>
+                    <p className="text-gray-500">Sẽ tự động hiển thị khi bạn nhập sản phẩm trong admin</p>
+                  </div>
+                  <button
+                    onClick={() => onNavigate('pricing')}
+                    className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-semibold"
+                  >
+                    Xem gói
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
 
+      {/* WordPress Popular Plans */}
       <section className="py-20 bg-gradient-to-br from-[#E6EEFF] to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -208,36 +266,131 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {featuredPlans.map((plan) => (
-              <div key={plan.id} className="bg-white rounded-2xl shadow-lg p-8 relative border-2 border-[#034CC9]">
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-[#034CC9] text-white px-6 py-2 rounded-full text-sm font-semibold">
-                    Được chọn nhiều nhất
-                  </span>
-                </div>
-                <div className="text-center mt-4 mb-6">
-                  <h3 className="text-2xl font-bold text-[#0B2B6F] mb-2">{plan.name}</h3>
-                  <p className="text-gray-600 mb-4">{plan.type === 'wordpress' ? 'WordPress Hosting' : plan.type === 'business' ? 'Business Hosting' : 'Email Domain'}</p>
+            {(wpProducts.length ? wpProducts : placeholderNames.wordpress.map((name, idx) => ({ id: `wp-placeholder-${idx}`, ten_san_pham: name } as any))).map((prod: any, idx: number) => (
+              <div key={prod.id || idx} className="bg-white rounded-2xl shadow-lg p-8 border-2 border-[#034CC9]">
+                <div className="text-center mt-2 mb-6">
+                  <h3 className="text-2xl font-bold text-[#0B2B6F] mb-2">{prod.ten_san_pham}</h3>
                   <div className="flex items-baseline justify-center mb-2">
-                    <span className="text-4xl font-bold text-[#034CC9]">
-                      {plan.price.monthly.toLocaleString('vi-VN')}₫
-                    </span>
-                    <span className="text-gray-500 ml-2">/tháng</span>
+                    {prod.gia_ban ? (
+                      <>
+                        <span className="text-4xl font-bold text-[#034CC9]">{prod.gia_ban}</span>
+                        <span className="text-gray-500 ml-2">{prod.don_vi || '/tháng'}</span>
+                      </>
+                    ) : (
+                      <span className="text-gray-500">Đang cập nhật giá</span>
+                    )}
                   </div>
-                  <p className="text-sm text-gray-500">
-                    {plan.price.yearly.toLocaleString('vi-VN')}₫/năm (tiết kiệm 20%)
-                  </p>
                 </div>
-                <ul className="space-y-3 mb-8">
-                  {plan.features.slice(0, 6).map((feature, idx) => (
-                    <li key={idx} className="flex items-start">
-                      <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                      <span className="text-gray-700 text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+
+                {extractFeatures(prod).length > 0 && (
+                  <ul className="space-y-3 mb-6">
+                    {extractFeatures(prod).slice(0,4).map((feature: string, fidx: number) => (
+                      <li key={fidx} className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700 text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
                 <button
-                  onClick={() => onAddToCart(plan, 'monthly')}
+                  onClick={() => onNavigate('pricing')}
+                  className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
+                >
+                  Chọn gói
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* VPS NVME Popular Plans */}
+      <section className="py-20 bg-gradient-to-br from-[#E6EEFF] to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#0B2B6F] mb-4">Gói được lựa chọn nhiều nhất</h2>
+            <p className="text-gray-600 text-lg">Phù hợp với hầu hết doanh nghiệp SME</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {(vpsProducts.length ? vpsProducts : placeholderNames.vps.map((name, idx) => ({ id: `vps-placeholder-${idx}`, ten_san_pham: name } as any))).map((prod: any, idx: number) => (
+              <div key={prod.id || idx} className="bg-white rounded-2xl shadow-lg p-8 border-2 border-[#034CC9]">
+                <div className="text-center mt-2 mb-6">
+                  <h3 className="text-2xl font-bold text-[#0B2B6F] mb-2">{prod.ten_san_pham}</h3>
+                  <div className="flex items-baseline justify-center mb-2">
+                    {prod.gia_ban ? (
+                      <>
+                        <span className="text-4xl font-bold text-[#034CC9]">{prod.gia_ban}</span>
+                        <span className="text-gray-500 ml-2">{prod.don_vi || '/tháng'}</span>
+                      </>
+                    ) : (
+                      <span className="text-gray-500">Đang cập nhật giá</span>
+                    )}
+                  </div>
+                </div>
+
+                {extractFeatures(prod).length > 0 && (
+                  <ul className="space-y-3 mb-6">
+                    {extractFeatures(prod).slice(0,4).map((feature: string, fidx: number) => (
+                      <li key={fidx} className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700 text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <button
+                  onClick={() => onNavigate('pricing')}
+                  className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
+                >
+                  Chọn gói
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Email Popular Plans */}
+      <section className="py-20 bg-gradient-to-br from-[#E6EEFF] to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-[#0B2B6F] mb-4">Gói được lựa chọn nhiều nhất</h2>
+            <p className="text-gray-600 text-lg">Phù hợp với hầu hết doanh nghiệp SME</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {(emailProducts.length ? emailProducts : placeholderNames.email.map((name, idx) => ({ id: `email-placeholder-${idx}`, ten_san_pham: name } as any))).map((prod: any, idx: number) => (
+              <div key={prod.id || idx} className="bg-white rounded-2xl shadow-lg p-8 border-2 border-[#034CC9]">
+                <div className="text-center mt-2 mb-6">
+                  <h3 className="text-2xl font-bold text-[#0B2B6F] mb-2">{prod.ten_san_pham}</h3>
+                  <div className="flex items-baseline justify-center mb-2">
+                    {prod.gia_ban ? (
+                      <>
+                        <span className="text-4xl font-bold text-[#034CC9]">{prod.gia_ban}</span>
+                        <span className="text-gray-500 ml-2">{prod.don_vi || '/tháng'}</span>
+                      </>
+                    ) : (
+                      <span className="text-gray-500">Đang cập nhật giá</span>
+                    )}
+                  </div>
+                </div>
+
+                {extractFeatures(prod).length > 0 && (
+                  <ul className="space-y-3 mb-6">
+                    {extractFeatures(prod).slice(0,4).map((feature: string, fidx: number) => (
+                      <li key={fidx} className="flex items-start">
+                        <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                        <span className="text-gray-700 text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <button
+                  onClick={() => onNavigate('pricing')}
                   className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
                 >
                   Chọn gói

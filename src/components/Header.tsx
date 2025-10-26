@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Menu, X, ChevronDown, Server, Mail, ShoppingCart, User } from 'lucide-react';
+import { Menu, X, ShoppingCart, User, Server } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
   onNavigate: (page: string) => void;
@@ -10,7 +11,12 @@ interface HeaderProps {
 
 export default function Header({ onNavigate, currentPage, cartItemCount = 0, isAdmin = false }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [productsDropdownOpen, setProductsDropdownOpen] = useState(false);
+  const { user, isLoggedIn } = useAuth();
+
+  // Ẩn nút Portal khi đang ở khu vực portal
+  const inPortalArea = ['portal', 'profile', 'my-services', 'my-orders', 'my-tickets'].includes(currentPage);
+
+  const displayName = (user?.ten || user?.name || user?.email || '').split('@')[0];
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">
@@ -23,50 +29,13 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
 
           <nav className="hidden md:flex items-center space-x-8">
             <button
-              onClick={() => onNavigate('home')}
+              onClick={() => onNavigate('pricing')}
               className={`text-sm font-medium transition-colors ${
-                currentPage === 'home' ? 'text-[#034CC9]' : 'text-gray-700 hover:text-[#034CC9]'
+                currentPage === 'pricing' ? 'text-[#034CC9]' : 'text-gray-700 hover:text-[#034CC9]'
               }`}
             >
-              Trang chủ
+              Bảng giá
             </button>
-
-            <div className="relative group">
-              <button
-                onMouseEnter={() => setProductsDropdownOpen(true)}
-                onMouseLeave={() => setProductsDropdownOpen(false)}
-                className="text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors flex items-center"
-              >
-                Sản phẩm
-                <ChevronDown className="ml-1 h-4 w-4" />
-              </button>
-              {productsDropdownOpen && (
-                <div
-                  className="absolute left-0 mt-2 w-64 bg-white rounded-lg shadow-lg py-2 z-50"
-                  onMouseEnter={() => setProductsDropdownOpen(true)}
-                  onMouseLeave={() => setProductsDropdownOpen(false)}
-                >
-                  <button
-                    onClick={() => { onNavigate('wordpress-hosting'); setProductsDropdownOpen(false); }}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-[#E6EEFF] hover:text-[#034CC9] transition-colors"
-                  >
-                    WordPress Hosting
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('business-hosting'); setProductsDropdownOpen(false); }}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-[#E6EEFF] hover:text-[#034CC9] transition-colors"
-                  >
-                    Business Hosting
-                  </button>
-                  <button
-                    onClick={() => { onNavigate('email-domain'); setProductsDropdownOpen(false); }}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-[#E6EEFF] hover:text-[#034CC9] transition-colors"
-                  >
-                    Email Domain
-                  </button>
-                </div>
-              )}
-            </div>
 
             <button
               onClick={() => onNavigate('advisor')}
@@ -78,12 +47,12 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
             </button>
 
             <button
-              onClick={() => onNavigate('pricing')}
+              onClick={() => onNavigate('contact')}
               className={`text-sm font-medium transition-colors ${
-                currentPage === 'pricing' ? 'text-[#034CC9]' : 'text-gray-700 hover:text-[#034CC9]'
+                currentPage === 'contact' ? 'text-[#034CC9]' : 'text-gray-700 hover:text-[#034CC9]'
               }`}
             >
-              Bảng giá
+              Liên hệ
             </button>
 
             <button
@@ -93,15 +62,6 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
               }`}
             >
               Blog
-            </button>
-
-            <button
-              onClick={() => onNavigate('contact')}
-              className={`text-sm font-medium transition-colors ${
-                currentPage === 'contact' ? 'text-[#034CC9]' : 'text-gray-700 hover:text-[#034CC9]'
-              }`}
-            >
-              Liên hệ
             </button>
           </nav>
 
@@ -118,13 +78,23 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
               )}
             </button>
 
-            <button
-              onClick={() => onNavigate('login')}
-              className="flex items-center text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors"
-            >
-              <User className="h-5 w-5 mr-1" />
-              Đăng nhập
-            </button>
+            {isLoggedIn ? (
+              <button
+                onClick={() => onNavigate('portal')}
+                className="flex items-center text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors"
+              >
+                <User className="h-5 w-5 mr-1" />
+                {displayName || 'Tài khoản'}
+              </button>
+            ) : (
+              <button
+                onClick={() => onNavigate('login')}
+                className="flex items-center text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors"
+              >
+                <User className="h-5 w-5 mr-1" />
+                Đăng nhập
+              </button>
+            )}
 
             {isAdmin ? (
               <button
@@ -134,12 +104,14 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
                 Admin
               </button>
             ) : (
-              <button
-                onClick={() => onNavigate('portal')}
-                className="bg-[#034CC9] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0B2B6F] transition-colors"
-              >
-                Portal
-              </button>
+              !inPortalArea && (
+                <button
+                  onClick={() => onNavigate('portal')}
+                  className="bg-[#034CC9] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0B2B6F] transition-colors"
+                >
+                  Portal
+                </button>
+              )
             )}
           </div>
 
@@ -154,29 +126,17 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t">
             <nav className="flex flex-col space-y-3">
-              <button onClick={() => { onNavigate('home'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
-                Trang chủ
-              </button>
-              <button onClick={() => { onNavigate('wordpress-hosting'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
-                WordPress Hosting
-              </button>
-              <button onClick={() => { onNavigate('business-hosting'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
-                Business Hosting
-              </button>
-              <button onClick={() => { onNavigate('email-domain'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
-                Email Domain
+              <button onClick={() => { onNavigate('pricing'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
+                Bảng giá
               </button>
               <button onClick={() => { onNavigate('advisor'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
                 Tư vấn
               </button>
-              <button onClick={() => { onNavigate('pricing'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
-                Bảng giá
+              <button onClick={() => { onNavigate('contact'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
+                Liên hệ
               </button>
               <button onClick={() => { onNavigate('blog'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
                 Blog
-              </button>
-              <button onClick={() => { onNavigate('contact'); setMobileMenuOpen(false); }} className="text-left px-2 py-2 text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors">
-                Liên hệ
               </button>
               <div className="flex items-center space-x-3 px-2 pt-3 border-t">
                 <button onClick={() => { onNavigate('cart'); setMobileMenuOpen(false); }} className="relative flex items-center text-sm font-medium text-gray-700">
@@ -185,17 +145,26 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
                 </button>
               </div>
               <div className="flex flex-col space-y-2 px-2">
-                <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} className="text-left py-2 text-sm font-medium text-gray-700">
-                  Đăng nhập
-                </button>
+                {isLoggedIn ? (
+                  <button onClick={() => { onNavigate('portal'); setMobileMenuOpen(false); }} className="text-left py-2 text-sm font-medium text-gray-700">
+                    <User className="h-5 w-5 inline mr-1" />
+                    {displayName || 'Tài khoản'}
+                  </button>
+                ) : (
+                  <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} className="text-left py-2 text-sm font-medium text-gray-700">
+                    Đăng nhập
+                  </button>
+                )}
                 {isAdmin ? (
                   <button onClick={() => { onNavigate('admin'); setMobileMenuOpen(false); }} className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium">
                     Admin
                   </button>
                 ) : (
-                  <button onClick={() => { onNavigate('portal'); setMobileMenuOpen(false); }} className="bg-[#034CC9] text-white px-4 py-2 rounded-lg text-sm font-medium">
-                    Portal
-                  </button>
+                  !inPortalArea && (
+                    <button onClick={() => { onNavigate('portal'); setMobileMenuOpen(false); }} className="bg-[#034CC9] text-white px-4 py-2 rounded-lg text-sm font-medium">
+                      Portal
+                    </button>
+                  )
                 )}
               </div>
             </nav>

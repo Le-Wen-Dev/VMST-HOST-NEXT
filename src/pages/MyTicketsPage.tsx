@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { MessageSquare, Plus, Send, Clock, CheckCircle, X } from 'lucide-react';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
+import { useState, useEffect } from 'react';
+import { MessageSquare, Plus, Send, Clock, CheckCircle, X, ChevronLeft } from 'lucide-react';
+
 import Modal from '../components/Modal';
+import { listTickets, createTicket, updateTicket, TicketDepartmentPB, TicketPriorityPB, TicketStatusPB } from '../services/tickets';
+import { getCurrentUser } from '../services/pocketbase';
 
 interface Ticket {
   id: string;
@@ -27,51 +28,40 @@ export default function MyTicketsPage({ onNavigate }: { onNavigate: (page: strin
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
 
-  const [tickets, setTickets] = useState<Ticket[]>([
-    {
-      id: 'TK-001',
-      subject: 'Không thể truy cập cPanel',
-      department: 'technical',
-      priority: 'high',
-      status: 'answered',
-      createdDate: '2025-10-08 09:30',
-      lastUpdate: '2025-10-08 14:20',
-      messages: [
-        {
-          id: 'm1',
-          sender: 'client',
-          senderName: 'Nguyễn Văn An',
-          message: 'Xin chào, tôi không thể đăng nhập vào cPanel. Hệ thống báo lỗi "Invalid credentials".',
-          timestamp: '2025-10-08 09:30'
-        },
-        {
-          id: 'm2',
-          sender: 'staff',
-          senderName: 'Support Team',
-          message: 'Xin chào anh An, chúng tôi đã kiểm tra và reset lại mật khẩu cho tài khoản của anh. Mật khẩu mới đã được gửi qua email.',
-          timestamp: '2025-10-08 14:20'
-        }
-      ]
-    },
-    {
-      id: 'TK-002',
-      subject: 'Nâng cấp gói dịch vụ',
-      department: 'sales',
-      priority: 'normal',
-      status: 'open',
-      createdDate: '2025-10-09 10:15',
-      lastUpdate: '2025-10-09 10:15',
-      messages: [
-        {
-          id: 'm3',
-          sender: 'client',
-          senderName: 'Nguyễn Văn An',
-          message: 'Tôi muốn nâng cấp từ gói Hosting Basic lên gói Pro. Chi phí là bao nhiêu?',
-          timestamp: '2025-10-09 10:15'
-        }
-      ]
-    }
-  ]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [statusFilter, setStatusFilter] = useState<'all' | TicketStatusPB>('all');
+  const [departmentFilter, setDepartmentFilter] = useState<'all' | TicketDepartmentPB>('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | TicketPriorityPB>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  async function fetchTickets() {
+    const user = getCurrentUser();
+    const res = await listTickets({ page, perPage, search: searchQuery.trim() || undefined, status: statusFilter, department: departmentFilter, priority: priorityFilter, userId: user?.id });
+    const mapped: Ticket[] = (res.items || []).map((r: any) => {
+      const repliesArray = Array.isArray(r.phan_hoi_cua_he_thong) ? r.phan_hoi_cua_he_thong : (r.phan_hoi_cua_he_thong ? [ { text: String(r.phan_hoi_cua_he_thong), at: r.updated } ] : []);
+      const messages = [
+        r.tin_nhan ? { id: r.id + '-c', sender: 'client', senderName: 'Bạn', message: r.tin_nhan, timestamp: r.created } : null,
+        ...repliesArray.map((m: any, idx: number) => ({ id: r.id + '-s' + idx, sender: 'staff' as const, senderName: 'Kỹ thuật', message: m?.text || String(m), timestamp: m?.at || r.updated }))
+      ].filter(Boolean) as Ticket['messages'];
+      const statusMapped: Ticket['status'] = r.trang_thai === 'dong_ticket' ? 'closed' : (r.trang_thai === 'cho_khach_rep' ? 'answered' : 'open');
+      return ({
+        id: r.id,
+        subject: r.tieu_de,
+        department: (r.bo_phan === 'sale' ? 'sales' : 'technical') as Ticket['department'],
+        priority: (r.do_uu_tien === 'cao' ? 'urgent' : r.do_uu_tien === 'trung_binh' ? 'normal' : 'low') as Ticket['priority'],
+        status: statusMapped,
+        createdDate: r.created,
+        lastUpdate: r.updated,
+        messages,
+      });
+    });
+    setTickets(mapped);
+  }
+
+  useEffect(() => { fetchTickets(); }, [page, perPage, statusFilter, departmentFilter, priorityFilter, searchQuery]);
+
 
   const getDepartmentLabel = (dept: string) => {
     const labels = {
@@ -120,61 +110,52 @@ export default function MyTicketsPage({ onNavigate }: { onNavigate: (page: strin
     return labels[status as keyof typeof labels];
   };
 
-  const handleCreateTicket = (e: React.FormEvent<HTMLFormElement>) => {
+  async function handleCreateTicketSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const newTicket: Ticket = {
-      id: `TK-${String(tickets.length + 1).padStart(3, '0')}`,
-      subject: formData.get('subject') as string,
-      department: formData.get('department') as 'technical' | 'sales' | 'billing',
-      priority: formData.get('priority') as 'low' | 'normal' | 'high' | 'urgent',
-      status: 'open',
-      createdDate: new Date().toLocaleString('vi-VN'),
-      lastUpdate: new Date().toLocaleString('vi-VN'),
-      messages: [
-        {
-          id: 'm' + Date.now(),
-          sender: 'client',
-          senderName: 'Nguyễn Văn An',
-          message: formData.get('message') as string,
-          timestamp: new Date().toLocaleString('vi-VN')
-        }
-      ]
-    };
-    setTickets([newTicket, ...tickets]);
-    setShowCreateModal(false);
-  };
+    const subject = formData.get('subject') as string;
+    const dept = (formData.get('department') as string) || 'technical';
+    const prio = (formData.get('priority') as string) || 'normal';
+    const message = formData.get('message') as string;
+    const user = getCurrentUser();
 
-  const handleReply = () => {
+    const bo_phan: TicketDepartmentPB = dept === 'sales' ? 'sale' : 'technical';
+    const do_uu_tien: TicketPriorityPB = prio === 'urgent' || prio === 'high' ? 'cao' : prio === 'normal' ? 'trung_binh' : 'thap';
+
+    await createTicket({ tieu_de: subject, tin_nhan: message, bo_phan, do_uu_tien, trang_thai: 'cho_tech_rep', khach_hang: user?.id });
+    setShowCreateModal(false);
+    fetchTickets();
+  }
+
+  const handleReply = async () => {
     if (!selectedTicket || !replyMessage.trim()) return;
 
-    const updatedTicket = {
-      ...selectedTicket,
-      lastUpdate: new Date().toLocaleString('vi-VN'),
-      messages: [
-        ...selectedTicket.messages,
-        {
-          id: 'm' + Date.now(),
-          sender: 'client' as const,
-          senderName: 'Nguyễn Văn An',
-          message: replyMessage,
-          timestamp: new Date().toLocaleString('vi-VN')
-        }
-      ]
-    };
-
-    setTickets(tickets.map(t => t.id === updatedTicket.id ? updatedTicket : t));
-    setSelectedTicket(updatedTicket);
-    setReplyMessage('');
+    try {
+      await updateTicket(selectedTicket.id, { tin_nhan: replyMessage.trim(), trang_thai: 'cho_tech_rep' });
+      setReplyMessage('');
+      setShowDetailModal(false);
+      fetchTickets();
+    } catch (err) {
+      console.error('Client reply failed', err);
+      alert('Gửi phản hồi thất bại');
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Header onNavigate={onNavigate} />
+      {/* Removed duplicate Header - App already renders a global Header */}
 
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="flex justify-between items-center mb-8">
           <div>
+            <div className="mb-3">
+              <button
+                onClick={() => { if (window.history.length > 1) window.history.back(); else onNavigate('portal'); }}
+                className="inline-flex items-center gap-2 text-sm text-gray-700 hover:text-[#034CC9]"
+              >
+                <ChevronLeft className="h-5 w-5" /> Quay lại
+              </button>
+            </div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Ticket hỗ trợ</h1>
             <p className="text-gray-600">Tạo và quản lý yêu cầu hỗ trợ của bạn</p>
           </div>
@@ -187,25 +168,31 @@ export default function MyTicketsPage({ onNavigate }: { onNavigate: (page: strin
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
-            <p className="text-gray-600 text-sm mb-1">Đang mở</p>
-            <p className="text-3xl font-bold text-gray-900">
-              {tickets.filter(t => t.status === 'open').length}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
-            <p className="text-gray-600 text-sm mb-1">Đã trả lời</p>
-            <p className="text-3xl font-bold text-gray-900">
-              {tickets.filter(t => t.status === 'answered').length}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-gray-500">
-            <p className="text-gray-600 text-sm mb-1">Đã đóng</p>
-            <p className="text-3xl font-bold text-gray-900">
-              {tickets.filter(t => t.status === 'closed').length}
-            </p>
-          </div>
+        {/* Bộ lọc */}
+        <div className="bg-white rounded-xl shadow-md p-4 flex flex-wrap gap-3 items-center mb-6">
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm theo tiêu đề hoặc nội dung"
+            className="px-3 py-2 border rounded-lg flex-1 min-w-[240px]"
+          />
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="px-3 py-2 border rounded-lg">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="cho_tech_rep">Chờ kỹ thuật</option>
+            <option value="cho_khach_rep">Chờ khách</option>
+            <option value="dong_ticket">Đã đóng</option>
+          </select>
+          <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value as any)} className="px-3 py-2 border rounded-lg">
+            <option value="all">Tất cả bộ phận</option>
+            <option value="technical">Kỹ thuật</option>
+            <option value="sale">Kinh doanh</option>
+          </select>
+          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value as any)} className="px-3 py-2 border rounded-lg">
+            <option value="all">Tất cả ưu tiên</option>
+            <option value="thap">Thấp</option>
+            <option value="trung_binh">Trung bình</option>
+            <option value="cao">Cao</option>
+          </select>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
@@ -253,16 +240,23 @@ export default function MyTicketsPage({ onNavigate }: { onNavigate: (page: strin
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => {
-                          setSelectedTicket(ticket);
-                          setShowDetailModal(true);
-                        }}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center gap-2 transition-all"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        Xem
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setSelectedTicket(ticket); setShowDetailModal(true); }}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold flex items-center gap-2 transition-all"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                          Xem
+                        </button>
+                        <button
+                          onClick={async () => { if (ticket.status === 'closed') return; try { await updateTicket(ticket.id, { trang_thai: 'dong_ticket' }); fetchTickets(); } catch (e) { alert('Đóng ticket thất bại'); } }}
+                          className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-all ${ticket.status === 'closed' ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                          title="Đóng ticket"
+                        >
+                          <X className="h-4 w-4" />
+                          Đóng
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -278,7 +272,7 @@ export default function MyTicketsPage({ onNavigate }: { onNavigate: (page: strin
         title="Tạo ticket hỗ trợ mới"
         size="lg"
       >
-        <form onSubmit={handleCreateTicket} className="space-y-6">
+        <form onSubmit={handleCreateTicketSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">
               Tiêu đề <span className="text-red-500">*</span>
@@ -353,7 +347,7 @@ export default function MyTicketsPage({ onNavigate }: { onNavigate: (page: strin
       <Modal
         isOpen={showDetailModal}
         onClose={() => setShowDetailModal(false)}
-        title={`Ticket ${selectedTicket?.id}: ${selectedTicket?.subject}`}
+        title={`Ticket ${selectedTicket?.id}: ${selectedTicket?.subject || ''}`}
         size="xl"
       >
         {selectedTicket && (
@@ -417,7 +411,7 @@ export default function MyTicketsPage({ onNavigate }: { onNavigate: (page: strin
         )}
       </Modal>
 
-      <Footer onNavigate={onNavigate} />
+      {/* Removed duplicate Footer - App already renders a global Footer */}
     </div>
   );
 }

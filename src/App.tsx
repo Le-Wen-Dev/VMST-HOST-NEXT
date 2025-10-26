@@ -23,6 +23,8 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import ChatWidget from './components/ChatWidget';
 import { LocaleProvider } from './contexts/LocaleContext';
 import { wordpressPlans, businessPlans, emailPlans, HostingPlan } from './data/mockData';
+import { useAuth } from './contexts/AuthContext';
+import FloatingContacts from './components/FloatingContacts';
 
 interface CartItem {
   plan: HostingPlan;
@@ -39,14 +41,65 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [pageParams, setPageParams] = useState<PageParams>({});
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { isLoggedIn, isAdmin, logout } = useAuth();
+
+  // Initialize currentPage from URL (support admin deep links)
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/admin')) {
+      setCurrentPage('admin');
+      return;
+    }
+    // Optionally map a few common pages
+    const map: Record<string, string> = {
+      '/': 'home',
+      '/pricing': 'pricing',
+      '/advisor': 'advisor',
+      '/contact': 'contact',
+      '/blog': 'blog',
+      '/cart': 'cart',
+      '/login': 'login',
+      '/portal': 'portal',
+      '/profile': 'profile',
+      '/my-services': 'my-services',
+      '/my-orders': 'my-orders',
+      '/my-tickets': 'my-tickets',
+      '/affiliate': 'affiliate',
+      '/support': 'support',
+    };
+    if (map[path]) setCurrentPage(map[path]);
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [currentPage]);
 
   const handleNavigate = (page: string, params?: PageParams) => {
+    // Update URL for all pages
+    const pageToPath: Record<string, (p?: PageParams) => string> = {
+      home: () => '/',
+      pricing: () => '/pricing',
+      advisor: () => '/advisor',
+      contact: () => '/contact',
+      blog: () => '/blog',
+      cart: () => '/cart',
+      login: () => '/login',
+      portal: () => '/portal',
+      profile: () => '/profile',
+      'my-services': () => '/my-services',
+      'my-orders': () => '/my-orders',
+      'my-tickets': () => '/my-tickets',
+      affiliate: () => '/affiliate',
+      support: () => '/support',
+      'blog-post': (pp) => `/blog/${pp?.slug || ''}`,
+      'blog-category': (pp) => `/blog/category/${pp?.category || ''}`,
+      admin: () => '/admin',
+    };
+    const toPath = pageToPath[page]?.(params);
+    if (toPath) {
+      window.history.pushState({}, '', toPath);
+    }
+
     setCurrentPage(page);
     if (params) {
       setPageParams(params);
@@ -75,16 +128,8 @@ function App() {
     setCart([]);
   };
 
-  const handleLogin = (email: string) => {
-    setIsLoggedIn(true);
-    if (email.includes('admin')) {
-      setIsAdmin(true);
-    }
-  };
-
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    setIsAdmin(false);
+    logout();
     setCurrentPage('home');
   };
 
@@ -119,42 +164,41 @@ function App() {
         return <CheckoutPageWithSePay cart={cart} onClearCart={handleClearCart} onNavigate={handleNavigate} />;
 
       case 'login':
-        return <LoginPage onLogin={handleLogin} onNavigate={handleNavigate} />;
+        return <LoginPage onNavigate={handleNavigate} />;
 
       case 'portal':
-        // Auto-login for demo - no authentication required
         if (!isLoggedIn) {
-          handleLogin('demo@vmst.host');
+          return <LoginPage onNavigate={handleNavigate} />;
         }
         return <PortalPage onNavigate={handleNavigate} onLogout={handleLogout} />;
 
       case 'profile':
         if (!isLoggedIn) {
-          handleLogin('demo@vmst.host');
+          return <LoginPage onNavigate={handleNavigate} />;
         }
         return <ProfilePage onNavigate={handleNavigate} />;
 
       case 'my-services':
         if (!isLoggedIn) {
-          handleLogin('demo@vmst.host');
+          return <LoginPage onNavigate={handleNavigate} />;
         }
         return <MyServicesPage onNavigate={handleNavigate} />;
 
       case 'my-orders':
         if (!isLoggedIn) {
-          handleLogin('demo@vmst.host');
+          return <LoginPage onNavigate={handleNavigate} />;
         }
         return <MyOrdersPage onNavigate={handleNavigate} />;
 
       case 'my-tickets':
         if (!isLoggedIn) {
-          handleLogin('demo@vmst.host');
+          return <LoginPage onNavigate={handleNavigate} />;
         }
         return <MyTicketsPage onNavigate={handleNavigate} />;
 
       case 'affiliate':
         if (!isLoggedIn) {
-          handleLogin('demo@vmst.host');
+          return <LoginPage onNavigate={handleNavigate} />;
         }
         return <AffiliatePage onNavigate={handleNavigate} />;
 
@@ -196,6 +240,7 @@ function App() {
 
         {currentPage !== 'admin' && <Footer onNavigate={handleNavigate} />}
         {currentPage !== 'admin' && <ChatWidget />}
+        {currentPage !== 'admin' && <FloatingContacts />}
       </div>
     </LocaleProvider>
   );
