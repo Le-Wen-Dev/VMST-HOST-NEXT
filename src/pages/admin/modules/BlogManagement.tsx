@@ -1,41 +1,158 @@
-import { useState } from 'react';
-import { Search, Plus, Edit2, Trash2, Eye, Calendar, TrendingUp, Star } from 'lucide-react';
-import { mockBlogPostsExtended } from '../../../data/adminData';
+import { useEffect, useState } from 'react';
+import { Search, Plus, Edit2, Trash2, Eye, Calendar } from 'lucide-react';
+import { CKEditor } from '@ckeditor/ckeditor5-react';
+import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
+import { listBlogs, BlogRecord, createBlog, updateBlog, deleteBlog, toSlug, getBlogImageUrl } from '../../../services/blogs';
+import { listCategoryBlogs, CategoryBlogRecord } from '../../../services/categoryBlogs';
+import { getCurrentUser } from '../../../services/pocketbase';
 
 export default function BlogManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [categories, setCategories] = useState<CategoryBlogRecord[]>([]);
+  const [posts, setPosts] = useState<BlogRecord[]>([]);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+
   const [showEditor, setShowEditor] = useState(false);
-  const [editingPost, setEditingPost] = useState<any>(null);
+  const [editingPost, setEditingPost] = useState<BlogRecord | null>(null);
 
-  const filteredPosts = mockBlogPostsExtended.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         post.excerpt.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || post.status === statusFilter;
-    const matchesCategory = categoryFilter === 'all' || post.categorySlug === categoryFilter;
-    return matchesSearch && matchesStatus && matchesCategory;
-  });
+  // Form state
+  const [title, setTitle] = useState('');
+  const [slug, setSlug] = useState('');
+  const [excerpt, setExcerpt] = useState('');
+  const [content, setContent] = useState('');
+  const [thumb, setThumb] = useState<File | string>('');
+  const [status, setStatus] = useState('draft');
+  const [authorId, setAuthorId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [tags, setTags] = useState('');
+  const [seoTitle, setSeoTitle] = useState('');
+  const [seoDesc, setSeoDesc] = useState('');
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      'draft': 'bg-gray-100 text-gray-800',
-      'published': 'bg-green-100 text-green-800',
-      'scheduled': 'bg-blue-100 text-blue-800'
-    };
-    return colors[status as keyof typeof colors];
+  useEffect(() => {
+    // Preload categories
+    (async () => {
+      try {
+        const res = await listCategoryBlogs({ page: 1, perPage: 100 });
+        setCategories(res.items);
+      } catch (e) {
+        console.error('Load categories error:', e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    // Load blogs with filters
+    (async () => {
+      setLoading(true);
+      try {
+        const filterStatus = statusFilter !== 'all' ? statusFilter : undefined;
+        const filterCategoryId = categoryFilter !== 'all' ? categoryFilter : undefined;
+        const res = await listBlogs({ page, perPage, search: searchTerm, status: filterStatus, categoryId: filterCategoryId, sort: '-created', expand: 'danh_muc,tac_gia' });
+        setPosts(res.items);
+        setTotalItems(res.totalItems);
+        setTotalPages(res.totalPages);
+      } catch (e) {
+        console.error('Load blogs error:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [page, perPage, searchTerm, statusFilter, categoryFilter]);
+
+  const resetForm = () => {
+    setTitle('');
+    setSlug('');
+    setExcerpt('');
+    setContent('');
+    setThumb('');
+    setStatus('draft');
+    setAuthorId(getCurrentUser()?.id || '');
+    setCategoryId('');
+    setTags('');
+    setSeoTitle('');
+    setSeoDesc('');
   };
 
-  const categories = Array.from(new Set(mockBlogPostsExtended.map(p => p.categorySlug)));
-
-  const handleEdit = (post: any) => {
+  const handleEdit = (post: BlogRecord) => {
     setEditingPost(post);
     setShowEditor(true);
+    setTitle(post.tieu_de || '');
+    setSlug(post.slug || '');
+    setExcerpt(post.mo_ta_ngan || '');
+    setContent(post.noi_dung_chinh || '');
+    // prefer thumbnail, fallback to legacy avatar
+    setThumb(post.thumbnail || post.avatar || '');
+    setStatus(post.trang_thai || 'draft');
+    setAuthorId(post.tac_gia || getCurrentUser()?.id || '');
+    setCategoryId(post.danh_muc || '');
+    setTags(post.tag || '');
+    setSeoTitle(post.seo_title || '');
+    setSeoDesc(post.seo_description || '');
   };
 
   const handleNewPost = () => {
     setEditingPost(null);
+    resetForm();
     setShowEditor(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      const payload = {
+        tieu_de: title,
+        slug: slug || toSlug(title),
+        mo_ta_ngan: excerpt,
+        noi_dung_chinh: content,
+        thumbnail: thumb,
+        trang_thai: status,
+        tac_gia: authorId || getCurrentUser()?.id,
+        danh_muc: categoryId || undefined,
+        tag: tags,
+        seo_title: seoTitle,
+        seo_description: seoDesc,
+      };
+      if (editingPost) {
+        await updateBlog(editingPost.id, payload);
+      } else {
+        await createBlog(payload);
+      }
+      // Reload list
+      const res = await listBlogs({ page, perPage, search: searchTerm, status: statusFilter !== 'all' ? statusFilter : undefined, categoryId: categoryFilter !== 'all' ? categoryFilter : undefined, sort: '-created', expand: 'danh_muc,tac_gia' });
+      setPosts(res.items);
+      setTotalItems(res.totalItems);
+      setTotalPages(res.totalPages);
+      setShowEditor(false);
+    } catch (e: any) {
+      alert('Lưu bài viết thất bại: ' + (e?.message || e));
+    }
+  };
+
+  const handleDelete = async (post: BlogRecord) => {
+    if (!confirm(`Xóa bài viết: ${post.tieu_de}?`)) return;
+    try {
+      await deleteBlog(post.id);
+      const res = await listBlogs({ page, perPage, search: searchTerm, status: statusFilter !== 'all' ? statusFilter : undefined, categoryId: categoryFilter !== 'all' ? categoryFilter : undefined, sort: '-created', expand: 'danh_muc,tac_gia' });
+      setPosts(res.items);
+      setTotalItems(res.totalItems);
+      setTotalPages(res.totalPages);
+    } catch (e: any) {
+      alert('Xóa thất bại: ' + (e?.message || e));
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      draft: 'bg-gray-100 text-gray-800',
+      pushlished: 'bg-green-100 text-green-800',
+      pending: 'bg-yellow-100 text-yellow-800',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
   if (showEditor) {
@@ -62,7 +179,11 @@ export default function BlogManagement() {
                 </label>
                 <input
                   type="text"
-                  defaultValue={editingPost?.title}
+                  value={title}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    if (!editingPost) setSlug(toSlug(e.target.value));
+                  }}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="Nhập tiêu đề bài viết"
                 />
@@ -73,7 +194,8 @@ export default function BlogManagement() {
                 </label>
                 <input
                   type="text"
-                  defaultValue={editingPost?.slug}
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="url-friendly-slug"
                 />
@@ -85,7 +207,8 @@ export default function BlogManagement() {
                 Mô tả ngắn (Excerpt)
               </label>
               <textarea
-                defaultValue={editingPost?.excerpt}
+                value={excerpt}
+                onChange={(e) => setExcerpt(e.target.value)}
                 rows={3}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="Mô tả ngắn gọn về bài viết"
@@ -96,11 +219,11 @@ export default function BlogManagement() {
               <label className="block text-sm font-bold text-gray-700 mb-2">
                 Nội dung chính <span className="text-red-500">*</span>
               </label>
-              <textarea
-                defaultValue={editingPost?.content}
-                rows={12}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                placeholder="Nội dung bài viết (Markdown supported)"
+              {/* Cast ClassicEditor to any to satisfy CKEditor React typing differences */}
+              <CKEditor
+                editor={ClassicEditor as any}
+                data={content}
+                onChange={(_, editor: any) => setContent(editor.getData())}
               />
             </div>
 
@@ -110,15 +233,14 @@ export default function BlogManagement() {
                   Danh mục
                 </label>
                 <select
-                  defaultValue={editingPost?.categorySlug}
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="wordpress">WordPress</option>
-                  <option value="hosting">Hosting</option>
-                  <option value="security">Bảo mật</option>
-                  <option value="email">Email</option>
-                  <option value="performance">Tối ưu</option>
-                  <option value="tutorial">Hướng dẫn</option>
+                  <option value="">-- Chọn danh mục --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -126,12 +248,13 @@ export default function BlogManagement() {
                   Trạng thái
                 </label>
                 <select
-                  defaultValue={editingPost?.status}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="scheduled">Scheduled</option>
+                  <option value="pushlished">Pushlished</option>
+                  <option value="pending">Pending</option>
                 </select>
               </div>
               <div>
@@ -140,22 +263,33 @@ export default function BlogManagement() {
                 </label>
                 <input
                   type="text"
-                  defaultValue={editingPost?.author}
+                  value={authorId}
+                  onChange={(e) => setAuthorId(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nhập ID tác giả (mặc định: bạn)"
                 />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">
-                Thumbnail URL
+                Thumbnail (upload file)
               </label>
-              <input
-                type="text"
-                defaultValue={editingPost?.thumbnail}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="https://images.pexels.com/..."
-              />
+              <div className="flex items-center gap-4">
+                {thumb && (
+                  <img
+                    src={thumb instanceof File ? URL.createObjectURL(thumb) : (editingPost ? getBlogImageUrl({ id: editingPost.id, thumbnail: String(thumb), avatar: String(thumb) }) : String(thumb))}
+                    alt="preview"
+                    className="w-16 h-16 rounded-lg object-cover border"
+                  />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setThumb(e.target.files?.[0] || '')}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
             <div className="border-t pt-6">
@@ -167,7 +301,8 @@ export default function BlogManagement() {
                   </label>
                   <input
                     type="text"
-                    defaultValue={editingPost?.metaTitle}
+                    value={seoTitle}
+                    onChange={(e) => setSeoTitle(e.target.value)}
                     maxLength={70}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
@@ -177,7 +312,8 @@ export default function BlogManagement() {
                     Meta Description (150-160 ký tự)
                   </label>
                   <textarea
-                    defaultValue={editingPost?.metaDescription}
+                    value={seoDesc}
+                    onChange={(e) => setSeoDesc(e.target.value)}
                     maxLength={160}
                     rows={3}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -189,38 +325,19 @@ export default function BlogManagement() {
                   </label>
                   <input
                     type="text"
-                    defaultValue={editingPost?.focusKeyword}
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="từ khóa chính"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Tags (phân cách bằng dấu phảy)
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={editingPost?.tags?.join(', ')}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="tag1, tag2, tag3"
+                    placeholder="tag1, tag2, ..."
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  defaultChecked={editingPost?.featured}
-                  className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-                />
-                <span className="text-sm font-semibold text-gray-700">Bài viết nổi bật</span>
-              </label>
-            </div>
+            {/* Tags/Featured optional fields could be added here */}
 
             <div className="flex gap-4 pt-6 border-t">
-              <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold">
+              <button onClick={handleSave} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold">
                 {editingPost ? 'Cập nhật bài viết' : 'Xuất bản'}
               </button>
               <button
@@ -254,28 +371,20 @@ export default function BlogManagement() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
-          <p className="text-gray-600 text-sm mb-1">Published</p>
-          <p className="text-3xl font-bold text-gray-900">
-            {mockBlogPostsExtended.filter(p => p.status === 'published').length}
-          </p>
+          <p className="text-gray-600 text-sm mb-1">Tổng số bài</p>
+          <p className="text-3xl font-bold text-gray-900">{totalItems}</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-          <p className="text-gray-600 text-sm mb-1">Draft</p>
-          <p className="text-3xl font-bold text-gray-900">
-            {mockBlogPostsExtended.filter(p => p.status === 'draft').length}
-          </p>
+          <p className="text-gray-600 text-sm mb-1">Đang xem trang</p>
+          <p className="text-3xl font-bold text-gray-900">{page}/{totalPages}</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
-          <p className="text-gray-600 text-sm mb-1">Total Views</p>
-          <p className="text-3xl font-bold text-gray-900">
-            {mockBlogPostsExtended.reduce((sum, p) => sum + p.views, 0).toLocaleString()}
-          </p>
+          <p className="text-gray-600 text-sm mb-1">Bộ lọc</p>
+          <p className="text-3xl font-bold text-gray-900">{statusFilter !== 'all' ? statusFilter : 'Tất cả'}</p>
         </div>
         <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
-          <p className="text-gray-600 text-sm mb-1">Featured</p>
-          <p className="text-3xl font-bold text-gray-900">
-            {mockBlogPostsExtended.filter(p => p.featured).length}
-          </p>
+          <p className="text-gray-600 text-sm mb-1">Danh mục</p>
+          <p className="text-3xl font-bold text-gray-900">{categoryFilter !== 'all' ? (categories.find(c => c.id === categoryFilter)?.name || '—') : 'Tất cả'}</p>
         </div>
       </div>
 
@@ -293,23 +402,33 @@ export default function BlogManagement() {
           </div>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
             className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">Tất cả trạng thái</option>
-            <option value="published">Published</option>
+            <option value="pushlished">Pushlished</option>
             <option value="draft">Draft</option>
-            <option value="scheduled">Scheduled</option>
+            <option value="pending">Pending</option>
           </select>
           <select
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
+            onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }}
             className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">Tất cả danh mục</option>
             {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
             ))}
+          </select>
+          <select
+            value={perPage}
+            onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
           </select>
         </div>
 
@@ -320,70 +439,43 @@ export default function BlogManagement() {
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Bài viết</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Danh mục</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Tác giả</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">SEO Score</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Views</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Trạng thái</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Ngày</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase">Hành động</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredPosts.map((post) => (
+              {posts.map((post) => (
                 <tr key={post.id} className="hover:bg-blue-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <img src={post.thumbnail} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                      <img src={(post.thumbnail || post.avatar) ? getBlogImageUrl(post) : 'https://placehold.co/120x120'} alt="" className="w-16 h-16 rounded-lg object-cover" />
                       <div className="flex-1">
-                        <p className="font-semibold text-gray-900 line-clamp-1">{post.title}</p>
-                        <p className="text-xs text-gray-600 mt-1 line-clamp-1">{post.excerpt}</p>
-                        {post.featured && (
-                          <span className="inline-flex items-center gap-1 text-xs text-yellow-600 mt-1">
-                            <Star className="h-3 w-3 fill-yellow-500" />
-                            Featured
-                          </span>
-                        )}
+                        <p className="font-semibold text-gray-900 line-clamp-1">{post.tieu_de}</p>
+                        <p className="text-xs text-gray-600 mt-1 line-clamp-1">{post.mo_ta_ngan}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
-                      {post.category}
+                      {post.expand?.danh_muc?.name || '—'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{post.author}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{post.expand?.tac_gia?.ten || '—'}</td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-green-500 h-2 rounded-full"
-                          style={{ width: `${post.metaTitle && post.metaDescription ? 90 : 50}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-600">
-                        {post.metaTitle && post.metaDescription ? '90%' : '50%'}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <TrendingUp className="h-4 w-4" />
-                      {post.views.toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(post.status)}`}>
-                      {post.status}
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(post.trang_thai || 'draft')}`}>
+                      {post.trang_thai || 'draft'}
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Calendar className="h-4 w-4" />
-                      {post.publishedDate}
+                      {new Date(post.created || '').toLocaleDateString()}
                     </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <button className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors">
+                      <button className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors" onClick={() => window.open(`/blog/${post.slug}`, '_blank')}>
                         <Eye className="h-4 w-4" />
                       </button>
                       <button
@@ -392,7 +484,7 @@ export default function BlogManagement() {
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
-                      <button className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors">
+                      <button onClick={() => handleDelete(post)} className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -401,6 +493,15 @@ export default function BlogManagement() {
               ))}
             </tbody>
           </table>
+          <div className="flex items-center justify-between mt-4">
+            <div className="text-sm text-gray-600">
+              Tổng: {totalItems} bài | Trang {page}/{totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <button disabled={page <= 1 || loading} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-2 border rounded-lg disabled:opacity-50">Trang trước</button>
+              <button disabled={page >= totalPages || loading} onClick={() => setPage(p => Math.min(totalPages, p + 1))} className="px-3 py-2 border rounded-lg disabled:opacity-50">Trang sau</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

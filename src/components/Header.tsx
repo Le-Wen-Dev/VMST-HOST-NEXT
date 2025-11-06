@@ -16,7 +16,8 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
   // Ẩn nút Portal khi đang ở khu vực portal
   const inPortalArea = ['portal', 'profile', 'my-services', 'my-orders', 'my-tickets'].includes(currentPage);
 
-  const displayName = (user?.ten || user?.name || user?.email || '').split('@')[0];
+  // Hiển thị đúng cột 'name' từ bảng user trên icon người dùng
+  const displayName = user?.name || '';
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50">

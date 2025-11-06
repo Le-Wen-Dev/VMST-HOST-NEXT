@@ -13,6 +13,7 @@ import SupportPage from './pages/SupportPage';
 import BlogPage from './pages/BlogPage';
 import BlogPostPage from './pages/BlogPostPage';
 import BlogCategoryPage from './pages/BlogCategoryPage';
+import BlogCategoriesPage from './pages/BlogCategoriesPage';
 import ContactPage from './pages/ContactPage';
 import ProfilePage from './pages/ProfilePage';
 import MyServicesPage from './pages/MyServicesPage';
@@ -50,6 +51,20 @@ function App() {
       setCurrentPage('admin');
       return;
     }
+    // Handle dynamic blog routes on initial load
+    if (path.startsWith('/blog/')) {
+      const parts = path.split('/').filter(Boolean); // e.g. ['blog', 'my-slug'] or ['blog', 'category', 'cat-slug']
+      if (parts[1] === 'category' && parts[2]) {
+        setCurrentPage('blog-category');
+        setPageParams({ category: parts[2] });
+        return;
+      }
+      if (parts[1]) {
+        setCurrentPage('blog-post');
+        setPageParams({ slug: parts[1] });
+        return;
+      }
+    }
     // Optionally map a few common pages
     const map: Record<string, string> = {
       '/': 'home',
@@ -57,6 +72,7 @@ function App() {
       '/advisor': 'advisor',
       '/contact': 'contact',
       '/blog': 'blog',
+      '/blog/categories': 'blog-categories',
       '/cart': 'cart',
       '/login': 'login',
       '/portal': 'portal',
@@ -82,6 +98,7 @@ function App() {
       advisor: () => '/advisor',
       contact: () => '/contact',
       blog: () => '/blog',
+      'blog-categories': () => '/blog/categories',
       cart: () => '/cart',
       login: () => '/login',
       portal: () => '/portal',
@@ -207,6 +224,9 @@ function App() {
 
       case 'blog':
         return <BlogPage onNavigate={handleNavigate} />;
+
+      case 'blog-categories':
+        return <BlogCategoriesPage onNavigate={handleNavigate} />;
 
       case 'blog-post':
         return <BlogPostPage slug={pageParams.slug || ''} onNavigate={handleNavigate} />;

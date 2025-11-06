@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { blogPosts, blogCategories } from '../data/mockData';
+import { getCategoryBySlug, CategoryBlogRecord } from '../services/categoryBlogs';
+import { listBlogs, BlogRecord } from '../services/blogs';
 
 interface BlogCategoryPageProps {
   categorySlug: string;
@@ -7,8 +9,24 @@ interface BlogCategoryPageProps {
 }
 
 export default function BlogCategoryPage({ categorySlug, onNavigate }: BlogCategoryPageProps) {
-  const category = blogCategories.find(c => c.slug === categorySlug);
-  const posts = blogPosts.filter(p => p.categorySlug === categorySlug);
+  const [category, setCategory] = useState<CategoryBlogRecord | null>(null);
+  const [posts, setPosts] = useState<BlogRecord[]>([]);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const cat = await getCategoryBySlug(categorySlug);
+        setCategory(cat);
+        if (cat?.id) {
+          const res = await listBlogs({ page: 1, perPage: 18, categoryId: cat.id, sort: '-created' });
+          setPosts(res.items);
+        }
+      } catch (e) {
+        console.error('Failed to load category/blogs:', e);
+      }
+    }
+    load();
+  }, [categorySlug]);
 
   if (!category) {
     return (
@@ -49,21 +67,21 @@ export default function BlogCategoryPage({ categorySlug, onNavigate }: BlogCateg
             >
               <div className="relative h-48 overflow-hidden">
                 <img
-                  src={post.thumbnail}
-                  alt={post.title}
+                  src={post.avatar || 'https://placehold.co/600x400'}
+                  alt={post.tieu_de}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                 />
               </div>
               <div className="p-6">
                 <div className="flex items-center text-sm text-gray-500 mb-3">
-                  <span>{post.date}</span>
+                  <span>{new Date(post.created || '').toLocaleDateString()}</span>
                   <span className="mx-2">•</span>
-                  <span>{post.readTime}</span>
+                  <span>{post.so_phut_doc || '—'}</span>
                 </div>
                 <h3 className="text-xl font-semibold text-[#0B2B6F] mb-3 group-hover:text-[#034CC9] transition-colors">
-                  {post.title}
+                  {post.tieu_de}
                 </h3>
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{post.excerpt}</p>
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{post.mo_ta_ngan}</p>
                 <div className="flex items-center text-[#034CC9] font-semibold text-sm group-hover:underline">
                   Đọc thêm
                   <ArrowRight className="ml-2 h-4 w-4" />

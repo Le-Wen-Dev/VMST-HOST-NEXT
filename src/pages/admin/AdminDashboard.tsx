@@ -5,6 +5,7 @@ import LeadManagement from './modules/LeadManagement';
 import ServerManagement from './modules/ServerManagement';
 import OrderManagement from './modules/OrderManagement';
 import BlogManagement from './modules/BlogManagement';
+import BlogCategoryManagement from './modules/BlogCategoryManagement';
 import UserManagement from './modules/UserManagement';
 import AffiliateManagement from './modules/AffiliateManagement';
 import Settings from './modules/Settings';
@@ -52,6 +53,29 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
 
+  // Helper: support both data shapes where order status may be `status` or `orderStatus`
+  const getOrderStatus = (o: { status?: string; orderStatus?: string }) => o.status ?? o.orderStatus ?? 'unknown';
+
+  const getStatusClass = (s: string) => {
+    switch (s) {
+      case 'provisioned':
+        return 'bg-green-100 text-green-800';
+      case 'approved':
+      case 'confirmed':
+        return 'bg-blue-100 text-blue-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'processing':
+        return 'bg-purple-100 text-purple-800';
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'orders', label: 'Đơn hàng', icon: ShoppingBag },
@@ -62,6 +86,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     { id: 'affiliate', label: 'Affiliate', icon: Link2 },
     { id: 'tickets', label: 'Tickets', icon: Ticket },
     { id: 'vouchers', label: 'Vouchers', icon: Tag },
+    { id: 'blog-categories', label: 'Danh mục Blog', icon: Tag },
     { id: 'blog', label: 'Blog', icon: FileText },
     { id: 'users', label: 'Người dùng', icon: Users },
     { id: 'settings', label: 'Cài đặt', icon: SettingsIcon }
@@ -91,7 +116,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           <div className="flex justify-between items-start">
             <div>
               <p className="text-gray-600 text-sm mb-1">Đơn hàng mới</p>
-              <p className="text-3xl font-bold text-gray-900">{mockOrders.filter(o => o.status === 'pending').length}</p>
+              <p className="text-3xl font-bold text-gray-900">{mockOrders.filter(o => getOrderStatus(o) === 'pending').length}</p>
               <p className="text-gray-500 text-sm mt-1">Cần xử lý</p>
             </div>
             <div className="bg-green-100 p-3 rounded-lg">
@@ -244,22 +269,22 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                 </td>
                 <td className="px-6 py-4 font-semibold">{order.total.toLocaleString('vi-VN')}₫</td>
                 <td className="px-6 py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    order.status === 'provisioned' ? 'bg-green-100 text-green-800' :
-                    order.status === 'approved' ? 'bg-blue-100 text-blue-800' :
-                    order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {order.status}
-                  </span>
+                  {(() => {
+                    const st = getOrderStatus(order as any);
+                    return (
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(st)}`}>
+                        {st}
+                      </span>
+                    );
+                  })()}
                 </td>
                 <td className="px-6 py-4">
-                  {order.status === 'pending' && (
+                  {getOrderStatus(order as any) === 'pending' && (
                     <button className="text-green-600 hover:text-green-800 font-semibold">
                       Duyệt
                     </button>
                   )}
-                  {order.status === 'approved' && (
+                  {getOrderStatus(order as any) === 'approved' && (
                     <button className="text-blue-600 hover:text-blue-800 font-semibold">
                       Provision
                     </button>
@@ -500,6 +525,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         return <TicketManagement />;
       case 'vouchers':
         return renderVouchers();
+      case 'blog-categories':
+        return <BlogCategoryManagement />;
       case 'blog':
         return <BlogManagement />;
       case 'users':

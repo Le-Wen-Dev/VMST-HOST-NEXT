@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Zap, Shield, Clock, Headphones, Server, Mail, Globe, ArrowRight, Check } from 'lucide-react';
-import { blogPosts } from '../data/mockData';
+import { listBlogs, BlogRecord } from '../services/blogs';
 import { listProducts, ProductRecord } from '../services/products';
 
 interface HomePageProps {
@@ -9,6 +9,19 @@ interface HomePageProps {
 }
 
 export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
+  const [latestPosts, setLatestPosts] = useState<BlogRecord[]>([]);
+
+  useEffect(() => {
+    async function loadLatest() {
+      try {
+        const res = await listBlogs({ page: 1, perPage: 3, sort: '-created' });
+        setLatestPosts(res.items);
+      } catch (e) {
+        console.error('Failed to load latest blogs:', e);
+      }
+    }
+    loadLatest();
+  }, []);
   const [activeTab, setActiveTab] = useState<'wordpress' | 'vps' | 'email'>('wordpress');
   const [wpProducts, setWpProducts] = useState<ProductRecord[]>([]);
   const [vpsProducts, setVpsProducts] = useState<ProductRecord[]>([]);
@@ -409,31 +422,31 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 mb-8">
-            {blogPosts.slice(0, 3).map((post) => (
+            {latestPosts.map((post) => (
               <div key={post.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => onNavigate('blog-post', { slug: post.slug })}>
                 <div className="relative h-48 overflow-hidden">
                   <img
-                    src={post.thumbnail}
-                    alt={post.title}
+                    src={post.avatar || 'https://placehold.co/600x400'}
+                    alt={post.tieu_de}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                   <div className="absolute top-4 left-4">
                     <span className="bg-[#034CC9] text-white px-3 py-1 rounded-full text-xs font-semibold">
-                      {post.category}
+                      {post.expand?.danh_muc?.name || 'Danh mục'}
                     </span>
                   </div>
                 </div>
                 <div className="p-6">
                   <div className="flex items-center text-sm text-gray-500 mb-3">
-                    <span>{post.date}</span>
+                    <span>{new Date(post.created || '').toLocaleDateString()}</span>
                     <span className="mx-2">•</span>
-                    <span>{post.readTime}</span>
+                    <span>{post.so_phut_doc || '—'}</span>
                   </div>
                   <h3 className="text-xl font-semibold text-[#0B2B6F] mb-3 group-hover:text-[#034CC9] transition-colors">
-                    {post.title}
+                    {post.tieu_de}
                   </h3>
                   <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {post.excerpt}
+                    {post.mo_ta_ngan}
                   </p>
                   <div className="flex items-center text-[#034CC9] font-semibold text-sm group-hover:underline">
                     Đọc thêm
