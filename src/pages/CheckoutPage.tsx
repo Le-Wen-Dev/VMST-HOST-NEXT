@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Check, Tag } from 'lucide-react';
 import { HostingPlan, vouchers } from '../data/mockData';
 import { createMyOrder } from '../services/orders';
+import { listProducts } from '../services/products';
+import { notifyAdminNewOrder } from '../services/adminNotifications';
 
 interface CartItem {
   plan: HostingPlan;
@@ -82,13 +84,42 @@ export default function CheckoutPage({ cart, onClearCart, onNavigate }: Checkout
         discount,
         total,
       };
+      // Liên kết sản phẩm vào đơn: tra theo tên sản phẩm để lấy id PocketBase
+      const productIds: string[] = [];
+      for (const c of cart) {
+        try {
+          const res = await listProducts({ perPage: 5, search: c.plan.name });
+          const exact = res.items.find(p => p.ten_san_pham.trim().toLowerCase() === c.plan.name.trim().toLowerCase());
+          if (exact) productIds.push(exact.id);
+        } catch (err) {
+          console.warn('Lấy id sản phẩm thất bại, sẽ vẫn tạo đơn không liên kết:', err);
+        }
+      }
+
       const order = await createMyOrder({
         gia_tri: `${total.toLocaleString('vi-VN')}₫`,
         ghi_chu_noi_bo: JSON.stringify(note),
-        // Optionally set san_pham when product ids are available
+        san_pham: productIds.length ? productIds : undefined,
         thanh_toan: 'cho_thanh_toan',
         trang_thai_su_dung: 'dang_su_dung',
       });
+      // Thông báo admin ngay sau khi tạo đơn
+      try {
+        await notifyAdminNewOrder(order, {
+          customer: {
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            company: formData.company,
+            domain: formData.domain,
+          },
+          items: cart.map((c) => ({ name: c.plan.name, duration: c.duration, price: c.price })),
+          totals: { subtotal, discount, total },
+        });
+      } catch (e) {
+        // Không chặn luồng người dùng nếu thông báo thất bại
+        console.warn('notifyAdminNewOrder failed', e);
+      }
       setOrderId(order.ma_don_hang || order.id);
       setOrderCompleted(true);
       onClearCart();

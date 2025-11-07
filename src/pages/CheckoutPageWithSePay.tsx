@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { Check, Tag, CreditCard, QrCode } from 'lucide-react';
+import { Tag, QrCode, Check } from 'lucide-react';
 import { HostingPlan, vouchers } from '../data/mockData';
-import SePayQRModal from '../components/SePayQRModal';
-import { sePayService } from '../services/sepay';
-import type { PaymentIntent, PaymentMethod } from '../types/payment';
-import { createMyOrder, updateOrder } from '../services/orders';
+import { createMyOrder } from '../services/orders';
+import { listProducts } from '../services/products';
+import { notifyAdminNewOrder } from '../services/adminNotifications';
 
 interface CartItem {
   plan: HostingPlan;
@@ -15,7 +14,7 @@ interface CartItem {
 interface CheckoutPageProps {
   cart: CartItem[];
   onClearCart: () => void;
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string, params?: any) => void;
 }
 
 export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }: CheckoutPageProps) {
@@ -29,12 +28,9 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
   const [voucherError, setVoucherError] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('sepay');
-  const [showSePayModal, setShowSePayModal] = useState(false);
-  const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [orderRecordId, setOrderRecordId] = useState<string | null>(null);
-  const [orderCode, setOrderCode] = useState<string | null>(null);
+  // Không hiển thị QR tại trang checkout. Sau khi tạo đơn sẽ chuyển sang trang riêng.
+  // Trang thanh toán riêng sẽ sinh QR. Checkout chỉ tạo đơn và chuyển hướng.
 
   const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
 
@@ -78,109 +74,73 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
   const discount = calculateDiscount();
   const total = subtotal - discount;
 
-  const handleCreatePaymentIntent = async () => {
+  // No dynamic payment intent — we keep a fixed VietQR. Checkout simply creates the order
+  // and shows instructions to transfer using the fixed QR/content.
+
+  const handleCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!formData.name || !formData.email || !formData.phone) {
       alert('Vui lòng điền đầy đủ thông tin');
       return;
     }
 
     setIsProcessing(true);
-
     try {
-      // 1) Tạo đơn hàng trên hệ thống trước khi tạo QR
+      // Tóm tắt gói dịch vụ khách mua để hiển thị ở ghi chú nội bộ cho admin
+      const itemsSummary = cart
+        .map(ci => `${ci.plan.name} - ${ci.price.toLocaleString('vi-VN')}₫ - ${ci.duration}`)
+        .join('; ');
+
+      // Tìm id sản phẩm trong PocketBase theo tên gói để liên kết vào đơn
+      const productIds: string[] = [];
+      for (const ci of cart) {
+        try {
+          const res = await listProducts({ perPage: 5, search: ci.plan.name });
+          const exact = res.items.find(p => p.ten_san_pham.trim().toLowerCase() === ci.plan.name.trim().toLowerCase());
+          if (exact) productIds.push(exact.id);
+        } catch (err) {
+          console.warn('Không thể lấy sản phẩm để liên kết đơn:', err);
+        }
+      }
+
       const createdOrder = await createMyOrder({
         gia_tri: String(total),
         thanh_toan: 'cho_thanh_toan',
         trang_thai_su_dung: 'tat_tam_thoi',
-        ghi_chu_noi_bo: `Khách: ${formData.name} | Email: ${formData.email} | Phone: ${formData.phone} | Domain: ${formData.domain || ''}`
+        san_pham: productIds.length ? productIds : undefined,
+        ghi_chu_noi_bo: `Khách: ${formData.name} | Email: ${formData.email} | Phone: ${formData.phone} | Domain: ${formData.domain || ''} | Sản phẩm: ${itemsSummary}`
       });
 
       const orderId = createdOrder.ma_don_hang || createdOrder.id;
-      setOrderRecordId(createdOrder.id);
-      setOrderCode(orderId);
 
-      // 2) Tạo payment intent với SePay
-      const sePayResponse = await sePayService.createPayment({
-        orderId,
-        amount: total,
-        description: `Thanh toán đơn hàng ${orderId} - ${formData.name}`,
-        returnUrl: `${window.location.origin}/?page=my-orders`,
-        callbackUrl: `${window.location.origin}/api/payments/webhook`,
-        expiresIn: 15 * 60
-      });
-
-      if (!sePayResponse.success) {
-        throw new Error('Không thể tạo mã QR thanh toán');
+      // Notify admin about new order
+      try {
+        await notifyAdminNewOrder(
+          createdOrder,
+          {
+            customer: {
+              name: formData.name,
+              email: formData.email,
+              phone: formData.phone,
+              company: formData.company,
+              domain: formData.domain,
+            },
+            items: cart.map(ci => ({ name: ci.plan.name, duration: ci.duration, price: ci.price })),
+            totals: { subtotal, discount, total },
+          }
+        );
+      } catch (err) {
+        console.warn('Admin notification failed (non-blocking):', err);
       }
 
-      const newPaymentIntent: PaymentIntent = {
-        id: `PI-${Date.now()}`,
-        orderId,
-        amount: total,
-        method: paymentMethod,
-        status: 'PENDING',
-        transactionRef: sePayResponse.transactionRef,
-        qrUrl: sePayResponse.qrUrl,
-        qrImage: sePayResponse.qrImage,
-        deepLink: sePayResponse.deepLink || null,
-        expiresAt: sePayResponse.expiresAt,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      localStorage.setItem(`payment_${orderId}`, JSON.stringify({
-        paymentIntent: newPaymentIntent,
-        orderData: {
-          orderId,
-          items: cart,
-          customer: formData,
-          subtotal,
-          discount,
-          total,
-          voucher: appliedVoucher
-        }
-      }));
-
-      setPaymentIntent(newPaymentIntent);
-      setShowSePayModal(true);
+      onClearCart();
+      // Chuyển hướng tới trang riêng hiển thị mã QR
+      onNavigate('payment-qr', { orderId, amount: total });
     } catch (error) {
-      console.error('Payment intent creation error:', error);
-      alert('Đã có lỗi xảy ra. Vui lòng thử lại sau.');
+      console.error('Create order error:', error);
+      alert('Đã có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại sau.');
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const handlePaymentSuccess = async () => {
-    setShowSePayModal(false);
-
-    // 3) Cập nhật trạng thái đơn hàng => đã thanh toán
-    try {
-      if (orderRecordId) {
-        await updateOrder(orderRecordId, { thanh_toan: 'da_thanh_toan', trang_thai_su_dung: 'dang_su_dung' });
-      }
-    } catch (err) {
-      console.error('Không thể cập nhật trạng thái đơn hàng sau thanh toán:', err);
-    }
-
-    onClearCart();
-    onNavigate('my-orders');
-  };
-
-  const handleRegenerateQR = async () => {
-    if (!paymentIntent) return;
-
-    setShowSePayModal(false);
-    await handleCreatePaymentIntent();
-  };
-
-  const handleCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (paymentMethod === 'sepay') {
-      await handleCreatePaymentIntent();
-    } else {
-      alert('Phương thức thanh toán này đang được phát triển');
     }
   };
 
@@ -279,64 +239,38 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
               </form>
             </div>
 
+            {/* Phương thức thanh toán */}
             <div className="bg-white rounded-xl shadow-md p-6">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Phương thức thanh toán</h2>
 
-              <div className="space-y-3">
-                <div
-                  onClick={() => setPaymentMethod('sepay')}
-                  className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
-                    paymentMethod === 'sepay'
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-blue-100 p-2 rounded-lg">
-                        <QrCode className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-900">SePay - QR Bank</p>
-                        <p className="text-sm text-gray-600">Quét mã QR để thanh toán</p>
-                      </div>
-                    </div>
-                    {paymentMethod === 'sepay' && (
-                      <Check className="h-6 w-6 text-blue-600" />
-                    )}
+              {/* Thẻ chọn phương thức VietQR (đã được chọn mặc định) */}
+              <div className="rounded-2xl border-2 border-blue-500 bg-blue-50 p-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-lg bg-blue-100 flex items-center justify-center ring-1 ring-blue-300">
+                    <QrCode className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <div className="text-gray-900 font-semibold">VietQR</div>
+                    <div className="text-gray-600 text-sm">Quét mã QR để thanh toán</div>
                   </div>
                 </div>
-
-                <div
-                  onClick={() => setPaymentMethod('vnpay')}
-                  className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
-                    paymentMethod === 'vnpay'
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-orange-100 p-2 rounded-lg">
-                        <CreditCard className="h-6 w-6 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-900">VNPay</p>
-                        <p className="text-sm text-gray-600">Đang phát triển</p>
-                      </div>
-                    </div>
-                    {paymentMethod === 'vnpay' && (
-                      <Check className="h-6 w-6 text-blue-600" />
-                    )}
-                  </div>
+                <div className="h-6 w-6 rounded-full border border-blue-400 bg-white flex items-center justify-center text-blue-600">
+                  <Check className="h-4 w-4" />
                 </div>
               </div>
+              <p className="mt-3 text-sm text-gray-500">Sau khi tạo đơn, hệ thống sẽ chuyển tới trang hiển thị VietQR để bạn quét và thanh toán.</p>
             </div>
           </div>
 
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-md p-6 sticky top-4 space-y-6">
               <h2 className="text-xl font-bold text-gray-900">Tóm tắt đơn hàng</h2>
+
+              {/* Thẻ nhỏ hiển thị phương thức thanh toán */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-800">
+                <QrCode className="h-4 w-4" />
+                <span className="text-sm font-semibold">Phương thức thanh toán: VietQR</span>
+              </div>
 
               <div className="space-y-4">
                 {cart.map((item, index) => (
@@ -401,22 +335,12 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
                 disabled={isProcessing}
                 className="w-full bg-blue-600 text-white py-4 rounded-lg hover:bg-blue-700 transition-colors font-bold text-lg disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                {isProcessing ? 'Đang xử lý...' : 'Thanh toán ngay'}
+                {isProcessing ? 'Đang xử lý...' : 'Tạo đơn và xác nhận'}
               </button>
             </div>
           </div>
         </div>
       </div>
-
-      {paymentIntent && (
-        <SePayQRModal
-          isOpen={showSePayModal}
-          onClose={() => setShowSePayModal(false)}
-          paymentIntent={paymentIntent}
-          onPaymentSuccess={handlePaymentSuccess}
-          onRegenerateQR={handleRegenerateQR}
-        />
-      )}
     </div>
   );
 }

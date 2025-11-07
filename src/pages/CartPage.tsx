@@ -1,5 +1,6 @@
-import { Trash2, ShoppingCart, ArrowRight } from 'lucide-react';
+import { Trash2, ShoppingCart, ArrowRight, Check } from 'lucide-react';
 import { HostingPlan } from '../data/mockData';
+import { formatMoneyVN } from '../utils/format';
 
 interface CartItem {
   plan: HostingPlan;
@@ -66,6 +67,7 @@ export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPag
                             <Trash2 className="h-5 w-5" />
                           </button>
                         </div>
+                        {/* Specs overview */}
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <p className="text-gray-500">Kỳ hạn</p>
@@ -75,13 +77,51 @@ export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPag
                             <p className="text-gray-500">Dung lượng</p>
                             <p className="font-semibold text-gray-900">{item.plan.storage}</p>
                           </div>
+                          <div>
+                            <p className="text-gray-500">Băng thông</p>
+                            <p className="font-semibold text-gray-900">{item.plan.bandwidth}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Website</p>
+                            <p className="font-semibold text-gray-900">{item.plan.websites}</p>
+                          </div>
+                          {typeof item.plan.emails !== 'undefined' && (
+                            <div>
+                              <p className="text-gray-500">Email</p>
+                              <p className="font-semibold text-gray-900">{item.plan.emails}</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-gray-500">Backup</p>
+                            <p className="font-semibold text-gray-900">{item.plan.backup}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Hỗ trợ</p>
+                            <p className="font-semibold text-gray-900">{item.plan.support}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">SLA</p>
+                            <p className="font-semibold text-gray-900">{item.plan.sla}</p>
+                          </div>
                         </div>
+                        {/* Feature list */}
+                        {Array.isArray(item.plan.features) && item.plan.features.length > 0 && (
+                          <ul className="space-y-2 mt-4">
+                            {item.plan.features.slice(0, 8).map((f, i) => (
+                              <li key={i} className="flex items-start text-sm text-gray-700">
+                                <Check className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                                <span>{f}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t flex justify-between items-center">
                       <span className="text-gray-600">Giá</span>
-                      <span className="text-2xl font-bold text-[#034CC9]">
-                        {item.price.toLocaleString('vi-VN')}₫
+                      <span className="text-2xl font-bold text-[#034CC9] flex items-baseline">
+                        {formatMoneyVN(item.price)}đ
+                        <span className="text-gray-500 ml-2 text-base">{(item.plan as any)?.unit || ''}</span>
                       </span>
                     </div>
                   </div>
@@ -96,7 +136,7 @@ export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPag
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between text-gray-700">
                     <span>Tạm tính</span>
-                    <span className="font-semibold">{subtotal.toLocaleString('vi-VN')}₫</span>
+                    <span className="font-semibold">{formatMoneyVN(subtotal)}đ</span>
                   </div>
                   <div className="flex justify-between text-gray-700">
                     <span>VAT (0%)</span>
@@ -105,7 +145,7 @@ export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPag
                   <div className="border-t pt-4 flex justify-between items-center">
                     <span className="text-lg font-semibold text-gray-900">Tổng cộng</span>
                     <span className="text-2xl font-bold text-[#034CC9]">
-                      {subtotal.toLocaleString('vi-VN')}₫
+                      {formatMoneyVN(subtotal)}đ
                     </span>
                   </div>
                 </div>

@@ -16,6 +16,7 @@ interface HostingPlan {
   support: string;
   sla: string;
   price: { monthly: number; quarterly: number; yearly: number };
+  unit?: string; // loaded from product.don_vi
   features: string[];
   recommended: boolean;
 }
@@ -73,6 +74,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
             support: '24/7',
             sla: '99.9%',
             price: { monthly: gia, quarterly: gia, yearly: gia },
+            unit: r.don_vi || '',
             features,
             recommended: false,
           } as HostingPlan;
@@ -220,9 +222,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
                     <span className="text-4xl font-bold text-[#034CC9]">
                       {getPriceByDuration(plan).toLocaleString('vi-VN')}₫
                     </span>
-                    <span className="text-gray-500 ml-2 text-sm">
-                      /{duration === 'monthly' ? 'tháng' : duration === 'quarterly' ? '3 tháng' : 'năm'}
-                    </span>
+                    <span className="text-gray-500 ml-2 text-sm">{plan.unit || ''}</span>
                   </div>
                 </div>
 

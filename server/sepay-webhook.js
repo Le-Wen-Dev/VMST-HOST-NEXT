@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import PocketBase from 'pocketbase';
 import { createHmac } from 'crypto';
+import nodemailer from 'nodemailer';
 
 // Load env from .env (server-side). You can set WEBHOOK_ENV_PATH to choose another file.
 dotenv.config({ path: process.env.WEBHOOK_ENV_PATH || '.env' });
@@ -16,6 +17,11 @@ const PB_URL = process.env.PB_URL || process.env.VITE_PB_URL || 'http://127.0.0.
 const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL || process.env.VITE_CONTACT_ADMIN_EMAIL || 'admin@vmst.host';
 const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD || process.env.VITE_CONTACT_ADMIN_PASSWORD || 'admin@!@#';
 const SEPAY_SECRET_KEY = process.env.SEPAY_SECRET_KEY || process.env.VITE_SEPAY_SECRET_KEY || '';
+const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || 'lequelcm@gmail.com';
+const SMTP_HOST = process.env.SMTP_HOST || '';
+const SMTP_PORT = Number(process.env.SMTP_PORT || 0);
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
 
 function generateSignature(data) {
   // Build canonical string: key=value&key=value sorted by keys
@@ -32,6 +38,33 @@ async function ensureAdmin(pb) {
 
 app.get('/health', (req, res) => {
   res.json({ ok: true, service: 'sepay-webhook', time: new Date().toISOString() });
+});
+
+// Simple email notifier for new orders
+app.post('/api/notify-new-order', async (req, res) => {
+  try {
+    const { to, subject, text } = req.body || {};
+    const target = to || ADMIN_NOTIFY_EMAIL;
+    if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+      console.log('[notify-new-order] SMTP not configured. Printing email to console instead.');
+      console.log('To:', target);
+      console.log('Subject:', subject);
+      console.log('Text:\n', text);
+      return res.json({ ok: true, simulated: true });
+    }
+    const transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465, // true for 465, false for other ports
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+    await transporter.verify();
+    await transporter.sendMail({ from: SMTP_USER, to: target, subject, text });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[notify-new-order] failed:', err);
+    return res.status(500).json({ ok: false, error: 'email_failed' });
+  }
 });
 
 app.post('/api/payments/webhook', async (req, res) => {

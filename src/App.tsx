@@ -7,6 +7,7 @@ import AdvisorPage from './pages/AdvisorPage';
 import PricingPage from './pages/PricingPage';
 import CartPage from './pages/CartPage';
 import CheckoutPageWithSePay from './pages/CheckoutPageWithSePay';
+import PaymentQRPage from './pages/PaymentQRPage.tsx';
 import LoginPage from './pages/LoginPage';
 import PortalPage from './pages/PortalPage';
 import SupportPage from './pages/SupportPage';
@@ -36,6 +37,8 @@ interface CartItem {
 interface PageParams {
   slug?: string;
   category?: string;
+  orderId?: string;
+  amount?: number;
 }
 
 function App() {
@@ -44,46 +47,54 @@ function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const { isLoggedIn, isAdmin, logout } = useAuth();
 
-  // Initialize currentPage from URL (support admin deep links)
+  // Đồng bộ state với URL khi load và khi back/forward (popstate)
   useEffect(() => {
-    const path = window.location.pathname;
-    if (path.startsWith('/admin')) {
-      setCurrentPage('admin');
-      return;
-    }
-    // Handle dynamic blog routes on initial load
-    if (path.startsWith('/blog/')) {
-      const parts = path.split('/').filter(Boolean); // e.g. ['blog', 'my-slug'] or ['blog', 'category', 'cat-slug']
-      if (parts[1] === 'category' && parts[2]) {
-        setCurrentPage('blog-category');
-        setPageParams({ category: parts[2] });
+    const syncFromLocation = () => {
+      const path = window.location.pathname;
+      if (path.startsWith('/admin')) {
+        setCurrentPage('admin');
         return;
       }
-      if (parts[1]) {
-        setCurrentPage('blog-post');
-        setPageParams({ slug: parts[1] });
-        return;
+      if (path.startsWith('/blog/')) {
+        const parts = path.split('/').filter(Boolean);
+        if (parts[1] === 'category' && parts[2]) {
+          setCurrentPage('blog-category');
+          setPageParams({ category: parts[2] });
+          return;
+        }
+        if (parts[1]) {
+          setCurrentPage('blog-post');
+          setPageParams({ slug: parts[1] });
+          return;
+        }
       }
-    }
-    // Optionally map a few common pages
-    const map: Record<string, string> = {
-      '/': 'home',
-      '/pricing': 'pricing',
-      '/advisor': 'advisor',
-      '/contact': 'contact',
-      '/blog': 'blog',
-      '/blog/categories': 'blog-categories',
-      '/cart': 'cart',
-      '/login': 'login',
-      '/portal': 'portal',
-      '/profile': 'profile',
-      '/my-services': 'my-services',
-      '/my-orders': 'my-orders',
-      '/my-tickets': 'my-tickets',
-      '/affiliate': 'affiliate',
-      '/support': 'support',
+      const map: Record<string, string> = {
+        '/': 'home',
+        '/pricing': 'pricing',
+        '/advisor': 'advisor',
+        '/contact': 'contact',
+        '/blog': 'blog',
+        '/blog/categories': 'blog-categories',
+        '/cart': 'cart',
+        '/payment-qr': 'payment-qr',
+        '/login': 'login',
+        '/portal': 'portal',
+        '/profile': 'profile',
+        '/my-services': 'my-services',
+        '/my-orders': 'my-orders',
+        '/my-tickets': 'my-tickets',
+        '/affiliate': 'affiliate',
+        '/support': 'support',
+      };
+      if (map[path]) setCurrentPage(map[path]);
     };
-    if (map[path]) setCurrentPage(map[path]);
+
+    // Initial sync
+    syncFromLocation();
+
+    // Listen to back/forward navigation
+    window.addEventListener('popstate', syncFromLocation);
+    return () => window.removeEventListener('popstate', syncFromLocation);
   }, []);
 
   useEffect(() => {
@@ -100,6 +111,7 @@ function App() {
       blog: () => '/blog',
       'blog-categories': () => '/blog/categories',
       cart: () => '/cart',
+      'payment-qr': () => '/payment-qr',
       login: () => '/login',
       portal: () => '/portal',
       profile: () => '/profile',
@@ -180,6 +192,15 @@ function App() {
       case 'checkout':
         return <CheckoutPageWithSePay cart={cart} onClearCart={handleClearCart} onNavigate={handleNavigate} />;
 
+      case 'payment-qr':
+        return (
+          <PaymentQRPage
+            orderId={pageParams.orderId || ''}
+            amount={pageParams.amount || 0}
+            onNavigate={handleNavigate}
+          />
+        );
+
       case 'login':
         return <LoginPage onNavigate={handleNavigate} />;
 
@@ -205,7 +226,7 @@ function App() {
         if (!isLoggedIn) {
           return <LoginPage onNavigate={handleNavigate} />;
         }
-        return <MyOrdersPage onNavigate={handleNavigate} />;
+        return <MyOrdersPage onNavigate={handleNavigate} highlightOrderId={pageParams.orderId} />;
 
       case 'my-tickets':
         if (!isLoggedIn) {

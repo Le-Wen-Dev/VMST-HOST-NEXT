@@ -47,7 +47,9 @@ export type OrderCreateInput = {
   server?: string; // relation id
   thanh_toan?: string;
   trang_thai_su_dung?: string;
-  san_pham?: string; // relation id
+  // In PocketBase, relation fields can be single or multiple. The app's "orders.san_pham"
+  // is configured as Multiple, so we accept either a single id or an array of ids here.
+  san_pham?: string | string[]; // relation id(s)
   ngay_het_han?: string; // ISO string
   khach_hang?: string; // relation id (customer/user id)
   gia_tri?: string;
@@ -83,8 +85,9 @@ export async function listOrders(params?: { page?: number; perPage?: number; tha
   }
   const filter = filters.length ? filters.join(' && ') : undefined;
 
-  // Progressive sort fallback: '-created' → 'created' → none
-  const sortCandidates: Array<string | undefined> = ['-created', 'created', undefined];
+  // Progressive sort fallback: '-ngay_dat_hang' → '-created_at' → '-created' → 'created' → none
+  // Ưu tiên ngay_dat_hang theo yêu cầu nghiệp vụ, sau đó mới fallback
+  const sortCandidates: Array<string | undefined> = ['-ngay_dat_hang', '-created_at', '-created', 'created', undefined];
   let lastErr: any = null;
   for (const sort of sortCandidates) {
     try {
@@ -129,23 +132,39 @@ export async function createOrder(input: OrderCreateInput): Promise<OrderRecord>
   // Align defaults to PocketBase enum values
   if (!payload.trang_thai_su_dung) payload.trang_thai_su_dung = 'tat_tam_thoi';
   if (!payload.thanh_toan) payload.thanh_toan = 'cho_thanh_toan';
-  // Remove empty strings for optional fields
-  ['server','san_pham','khach_hang','ngay_het_han','gia_tri','hoa_hong_cho_aff','host_url','host_username','host_password','ghi_chu_noi_bo'].forEach((k) => {
+  // Remove empty strings for optional fields and normalize relation arrays
+  ['server','khach_hang','ngay_het_han','gia_tri','hoa_hong_cho_aff','host_url','host_username','host_password','ghi_chu_noi_bo'].forEach((k) => {
     if (payload[k] !== undefined && String(payload[k]).trim() === '') {
       delete payload[k];
     }
   });
+  if (payload.san_pham !== undefined) {
+    if (Array.isArray(payload.san_pham)) {
+      payload.san_pham = payload.san_pham.filter((id: any) => typeof id === 'string' && id.trim() !== '');
+      if (payload.san_pham.length === 0) delete payload.san_pham;
+    } else if (typeof payload.san_pham === 'string') {
+      if (payload.san_pham.trim() === '') delete payload.san_pham;
+    }
+  }
   return await pbOrders.collection(ORDERS_COLLECTION).create(payload) as unknown as OrderRecord;
 }
 
 export async function updateOrder(id: string, data: Partial<OrderCreateInput>): Promise<OrderRecord> {
   await ensureOrdersAdminAuth();
   const payload: any = { ...data };
-  ['server','san_pham','khach_hang','ngay_het_han','gia_tri','hoa_hong_cho_aff','host_url','host_username','host_password','ghi_chu_noi_bo'].forEach((k) => {
+  ['server','khach_hang','ngay_het_han','gia_tri','hoa_hong_cho_aff','host_url','host_username','host_password','ghi_chu_noi_bo'].forEach((k) => {
     if (payload[k] !== undefined && String(payload[k]).trim() === '') {
       delete payload[k];
     }
   });
+  if (payload.san_pham !== undefined) {
+    if (Array.isArray(payload.san_pham)) {
+      payload.san_pham = payload.san_pham.filter((id: any) => typeof id === 'string' && id.trim() !== '');
+      if (payload.san_pham.length === 0) delete payload.san_pham;
+    } else if (typeof payload.san_pham === 'string') {
+      if (payload.san_pham.trim() === '') delete payload.san_pham;
+    }
+  }
   return await pbOrders.collection(ORDERS_COLLECTION).update(id, payload) as unknown as OrderRecord;
 }
 
@@ -163,18 +182,35 @@ export async function listMyOrders(params?: { page?: number; perPage?: number; e
   const userId = pb.authStore.model?.id as string;
   const page = params?.page ?? 1;
   const perPage = params?.perPage ?? 20;
-  const res = await pb.collection(ORDERS_COLLECTION).getList(page, perPage, {
-    filter: `khach_hang = \"${userId}\"`,
-    sort: '-created',
-    expand: params?.expand,
-  });
-  return {
-    items: res.items as unknown as OrderRecord[],
-    page: res.page,
-    perPage: res.perPage,
-    totalPages: res.totalPages,
-    totalItems: res.totalItems,
-  };
+
+  // Progressive sort fallback: '-ngay_dat_hang' → '-created_at' → '-created' → 'created' → none
+  const sortCandidates: Array<string | undefined> = ['-ngay_dat_hang', '-created_at', '-created', 'created', undefined];
+  let lastErr: any = null;
+  for (const sort of sortCandidates) {
+    try {
+      const res = await pb.collection(ORDERS_COLLECTION).getList(page, perPage, {
+        filter: `khach_hang = \"${userId}\"`,
+        sort,
+        expand: params?.expand,
+      });
+      return {
+        items: res.items as unknown as OrderRecord[],
+        page: res.page,
+        perPage: res.perPage,
+        totalPages: res.totalPages,
+        totalItems: res.totalItems,
+      };
+    } catch (err: any) {
+      lastErr = err;
+      if (err?.status !== 400) break; // Only fallback for bad query
+    }
+  }
+  const status = lastErr?.status || lastErr?.code;
+  const msg = lastErr?.message || 'Không thể tải danh sách đơn hàng';
+  if (status === 400) {
+    throw new Error(`${msg}. Gợi ý: kiểm tra field sort 'created' của collection PocketBase.`);
+  }
+  throw new Error(`${msg} (status ${status}). Vui lòng kiểm tra VITE_PB_URL và phiên đăng nhập.`);
 }
 
 export async function createMyOrder(input: Partial<OrderCreateInput>): Promise<OrderRecord> {
@@ -188,11 +224,19 @@ export async function createMyOrder(input: Partial<OrderCreateInput>): Promise<O
   }
   if (!payload.trang_thai_su_dung) payload.trang_thai_su_dung = 'tat_tam_thoi';
   if (!payload.thanh_toan) payload.thanh_toan = 'cho_thanh_toan';
-  ['server','san_pham','khach_hang','ngay_het_han','gia_tri','hoa_hong_cho_aff','host_url','host_username','host_password','ghi_chu_noi_bo'].forEach((k) => {
+  ['server','khach_hang','ngay_het_han','gia_tri','hoa_hong_cho_aff','host_url','host_username','host_password','ghi_chu_noi_bo'].forEach((k) => {
     if (payload[k] !== undefined && String(payload[k]).trim() === '') {
       delete payload[k];
     }
   });
+  if (payload.san_pham !== undefined) {
+    if (Array.isArray(payload.san_pham)) {
+      payload.san_pham = payload.san_pham.filter((id: any) => typeof id === 'string' && id.trim() !== '');
+      if (payload.san_pham.length === 0) delete payload.san_pham;
+    } else if (typeof payload.san_pham === 'string') {
+      if (payload.san_pham.trim() === '') delete payload.san_pham;
+    }
+  }
   return await pb.collection(ORDERS_COLLECTION).create(payload) as unknown as OrderRecord;
 }
 

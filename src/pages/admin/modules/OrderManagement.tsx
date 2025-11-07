@@ -80,7 +80,8 @@ export default function OrderManagement() {
           host_username: r.host_username,
           host_password: r.host_password,
           ghi_chu_noi_bo: r.ghi_chu_noi_bo,
-          createdDate: (r.ngay_dat_hang || r.created || '').slice(0, 19).replace('T', ' '),
+          // Ngày tạo: ưu tiên ngay_dat_hang (ngày đặt hàng), sau đó created_at rồi created
+          createdDate: (r.ngay_dat_hang || r.created_at || r.created || '').slice(0, 19).replace('T', ' '),
           expand: r.expand,
           _raw: r,
         }));
@@ -128,6 +129,14 @@ export default function OrderManagement() {
     return matchesSearch && matchesOrderStatus && matchesPaymentStatus;
   });
 
+  // Đưa đơn hàng mới nhất lên đầu bảng theo ngay_dat_hang, kể cả khi backend sort không hoạt động
+  const sortedOrders = [...filteredOrders].sort((a, b) => {
+    const normalize = (v: any) => (typeof v === 'string' ? v.replace(' ', 'T') : v);
+    const ta = new Date(normalize((a as any)._raw?.ngay_dat_hang || (a as any).ngay_dat_hang || (a as any)._raw?.created_at || (a as any).created_at || (a as any)._raw?.created || (a as any).created)).getTime() || 0;
+    const tb = new Date(normalize((b as any)._raw?.ngay_dat_hang || (b as any).ngay_dat_hang || (b as any)._raw?.created_at || (b as any).created_at || (b as any)._raw?.created || (b as any).created)).getTime() || 0;
+    return tb - ta;
+  });
+
   const getOrderStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       'pending': 'bg-yellow-100 text-yellow-800',
@@ -135,7 +144,9 @@ export default function OrderManagement() {
       'processing': 'bg-purple-100 text-purple-800',
       'active': 'bg-green-100 text-green-800',
       'cancelled': 'bg-red-100 text-red-800',
+      'tat_tam_thoi': 'bg-gray-100 text-gray-800',
       'dang_su_dung': 'bg-green-100 text-green-800',
+      'het_han_su_dung': 'bg-red-100 text-red-800',
       'da_huy': 'bg-red-100 text-red-800',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
@@ -246,7 +257,8 @@ export default function OrderManagement() {
         host_username: r.host_username,
         host_password: r.host_password,
         ghi_chu_noi_bo: r.ghi_chu_noi_bo,
-        createdDate: (r.ngay_dat_hang || r.created || '').slice(0, 19).replace('T', ' '),
+        // Ngày tạo: ưu tiên ngay_dat_hang (ngày đặt hàng), sau đó created_at rồi created
+        createdDate: (r.ngay_dat_hang || r.created_at || r.created || '').slice(0, 19).replace('T', ' '),
         _raw: r,
       })));
     } catch (err: any) {
@@ -327,11 +339,10 @@ export default function OrderManagement() {
   ];
 
   const usageOptions = [
-    { value: 'pending', label: 'Chờ xử lý' },
-    { value: 'confirmed', label: 'Đã xác nhận' },
-    { value: 'processing', label: 'Đang xử lý' },
-    { value: 'active', label: 'Hoạt động' },
-    { value: 'cancelled', label: 'Đã hủy' },
+    { value: 'tat_tam_thoi', label: 'Tắt tạm thời' },
+    { value: 'dang_su_dung', label: 'Đang sử dụng' },
+    { value: 'het_han_su_dung', label: 'Hết hạn sử dụng' },
+    { value: 'da_huy', label: 'Đã hủy' },
   ];
 
   // Inline update handlers
@@ -499,7 +510,7 @@ export default function OrderManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredOrders.map((order) => (
+              {sortedOrders.map((order) => (
                 <tr key={order.id} className="hover:bg-blue-50 transition-colors">
                   <td className="px-4 py-4">
                     <div>
@@ -567,7 +578,7 @@ export default function OrderManagement() {
                     </div>
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-600">{order.createdDate}</td>
-                  <td className="px-4 py-4 text-sm text-gray-600">{formatExpireDiff(order._raw?.ngay_dat_hang || order._raw?.created, order.ngay_het_han)}</td>
+                  <td className="px-4 py-4 text-sm text-gray-600">{formatExpireDiff(order._raw?.ngay_dat_hang || order._raw?.created_at || order._raw?.created, order.ngay_het_han)}</td>
                   <td className="px-4 py-4">
                     <div>
                       <p className="text-xs text-gray-600">{formatCustomerLabel(order)}</p>
@@ -591,7 +602,7 @@ export default function OrderManagement() {
                   </td>
                 </tr>
               ))}
-              {filteredOrders.length === 0 && !loading && (
+              {sortedOrders.length === 0 && !loading && (
                 <tr>
                   <td colSpan={10} className="px-4 py-6 text-center text-gray-500">Không có đơn hàng</td>
                 </tr>

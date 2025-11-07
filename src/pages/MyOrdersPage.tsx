@@ -19,7 +19,7 @@ interface DisplayOrder {
   host_password?: string;
 }
 
-export default function MyOrdersPage({ onNavigate }: { onNavigate: (page: string) => void }) {
+export default function MyOrdersPage({ onNavigate, highlightOrderId }: { onNavigate: (page: string) => void; highlightOrderId?: string }) {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<DisplayOrder | null>(null);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -34,7 +34,13 @@ export default function MyOrdersPage({ onNavigate }: { onNavigate: (page: string
     setError(null);
     try {
       const res = await listMyOrders({ page, perPage, expand: 'san_pham' });
-      setOrders(res.items);
+      // Đảm bảo đơn mới nhất lên đầu ngay cả khi backend không sort được
+      const sorted = [...res.items].sort((a, b) => {
+        const ta = new Date(a.created || 0).getTime();
+        const tb = new Date(b.created || 0).getTime();
+        return tb - ta;
+      });
+      setOrders(sorted);
       setTotalPages(res.totalPages);
     } catch (err: any) {
       setError(err?.message || 'Không thể tải danh sách đơn hàng');
@@ -48,10 +54,33 @@ export default function MyOrdersPage({ onNavigate }: { onNavigate: (page: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, perPage]);
 
+  // Khi có highlightOrderId, tự động mở modal chi tiết đơn tương ứng sau khi dữ liệu tải xong
+  useEffect(() => {
+    if (!highlightOrderId || orders.length === 0) return;
+    const target = displayOrders.find((o) => o.id === highlightOrderId);
+    if (target) {
+      setSelectedOrder(target);
+      setShowDetailModal(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightOrderId, orders]);
+
   const displayOrders: DisplayOrder[] = useMemo(() => {
     return orders.map((o) => {
-      const productName = o.expand?.san_pham?.ten_san_pham || o.san_pham || 'Dịch vụ';
-      const orderDate = o.created ? new Date(o.created).toLocaleDateString('vi-VN') : '';
+      let productName: string = 'Dịch vụ';
+      const expanded = (o as any).expand?.san_pham;
+      if (Array.isArray(expanded) && expanded.length > 0) {
+        productName = expanded.map((p: any) => p?.ten_san_pham || '').filter(Boolean).join(', ');
+      } else if (expanded?.ten_san_pham) {
+        productName = expanded.ten_san_pham;
+      } else if (typeof o.san_pham === 'string') {
+        productName = o.san_pham;
+      }
+      // Ngày đặt hàng: ưu tiên trường ngay_dat_hang từ DB; fallback sang created_at/created
+      const rawOrderDate = (o as any).ngay_dat_hang || (o as any)?._raw?.ngay_dat_hang || (o as any).created_at || (o as any).created || (o as any)?._raw?.created;
+      // Một số DB lưu định dạng "YYYY-MM-DD HH:mm:ss", chuyển thành ISO trước khi parse
+      const normalizedOrderDate = typeof rawOrderDate === 'string' ? rawOrderDate.replace(' ', 'T') : rawOrderDate;
+      const orderDate = rawOrderDate ? new Date(normalizedOrderDate).toLocaleDateString('vi-VN') : '';
       const totalText = o.gia_tri || '-';
       const priceText = o.gia_tri || '-';
       const paymentStatus = o.thanh_toan || 'cho_thanh_toan';
@@ -83,6 +112,10 @@ export default function MyOrdersPage({ onNavigate }: { onNavigate: (page: string
       'cho_duyet': 'bg-yellow-100 text-yellow-800',
       'da_duyet': 'bg-green-100 text-green-800',
       'da_huy': 'bg-red-100 text-red-800',
+      // PB Vietnamese enums
+      'tat_tam_thoi': 'bg-gray-100 text-gray-800',
+      'dang_su_dung': 'bg-green-100 text-green-800',
+      'het_han_su_dung': 'bg-red-100 text-red-800',
     };
     return colors[normalized] || 'bg-gray-100 text-gray-800';
   };
@@ -98,6 +131,10 @@ export default function MyOrdersPage({ onNavigate }: { onNavigate: (page: string
       'cho_duyet': 'Chờ duyệt',
       'da_duyet': 'Đã duyệt',
       'da_huy': 'Đã hủy',
+      // PB Vietnamese enums
+      'tat_tam_thoi': 'Tắt tạm thời',
+      'dang_su_dung': 'Đang sử dụng',
+      'het_han_su_dung': 'Hết hạn sử dụng',
     };
     return labels[normalized] || status;
   };
@@ -427,10 +464,7 @@ export default function MyOrdersPage({ onNavigate }: { onNavigate: (page: string
           </div>
         )}
       </Modal>
--
--      <Footer onNavigate={onNavigate} />
-+
-+      {/* Removed duplicate Footer - App already renders a global Footer */}
-     </div>
-   );
- }
+      {/* Removed duplicate Footer - App already renders a global Footer */}
+    </div>
+  );
+}

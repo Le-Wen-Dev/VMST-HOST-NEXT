@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Zap, Shield, Clock, Headphones, Server, Mail, Globe, ArrowRight, Check } from 'lucide-react';
-import { listBlogs, BlogRecord } from '../services/blogs';
+import { listBlogs, BlogRecord, getBlogImageUrl } from '../services/blogs';
 import { listProducts, ProductRecord } from '../services/products';
+import { formatMoneyVN } from '../utils/format';
 
 interface HomePageProps {
   onNavigate: (page: string, params?: any) => void;
@@ -98,6 +99,14 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
     // unique & non-empty
     const unique = Array.from(new Set(features.filter(Boolean)));
     return unique.slice(0, 6);
+  };
+
+  const getSpecs = (prod: ProductRecord) => {
+    const ts: any = (prod as any).thong_so || {};
+    const core = ts['Core'] || ts['CPU'] || ts['vCPU'] || ts['Cores'] || ts['Số core'];
+    const ram = ts['RAM'] || ts['Memory'] || ts['Bộ nhớ'] || ts['Số ram'];
+    const disk = ts['Dung lượng'] || ts['DL'] || ts['Storage'] || ts['Disk'] || ts['Ổ đĩa'] || ts['Số disk'];
+    return { core, ram, disk } as { core?: string; ram?: string; disk?: string };
   };
 
   return (
@@ -219,16 +228,25 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
                     <h3 className="text-2xl font-bold text-[#0B2B6F]">{prod.ten_san_pham}</h3>
                     <p className="text-gray-600">{(prod.danh_muc || '').toUpperCase()}</p>
                   </div>
-                  <div className="text-center mb-6">
+                  <div className="text-center mb-4">
                     {prod.gia_ban ? (
                       <div className="flex items-baseline justify-center">
-                        <span className="text-3xl font-bold text-[#034CC9]">{prod.gia_ban}</span>
+                        <span className="text-3xl font-bold text-[#034CC9]">{formatMoneyVN(prod.gia_ban)}</span>
                         <span className="text-gray-500 ml-2">{prod.don_vi || ''}</span>
                       </div>
                     ) : (
                       <p className="text-gray-500">Đang cập nhật giá</p>
                     )}
                   </div>
+
+                  {/* Specs: Core, RAM, Disk */}
+                  {(() => { const s = getSpecs(prod); return (s.core || s.ram || s.disk); })() && (
+                    <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+                      <span className="px-3 py-1 bg-gray-100 rounded text-sm">Core: {getSpecs(prod).core || '-'}</span>
+                      <span className="px-3 py-1 bg-gray-100 rounded text-sm">RAM: {getSpecs(prod).ram || '-'}</span>
+                      <span className="px-3 py-1 bg-gray-100 rounded text-sm">Disk: {getSpecs(prod).disk || '-'}</span>
+                    </div>
+                  )}
 
                   {/* Tính năng/Thông số hiển thị đẹp như giao diện mẫu */}
                   {extractFeatures(prod).length > 0 && (
@@ -286,13 +304,22 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
                   <div className="flex items-baseline justify-center mb-2">
                     {prod.gia_ban ? (
                       <>
-                        <span className="text-4xl font-bold text-[#034CC9]">{prod.gia_ban}</span>
-                        <span className="text-gray-500 ml-2">{prod.don_vi || '/tháng'}</span>
+                        <span className="text-4xl font-bold text-[#034CC9]">{formatMoneyVN(prod.gia_ban)}</span>
+                        <span className="text-gray-500 ml-2">{prod.don_vi || ''}</span>
                       </>
                     ) : (
                       <span className="text-gray-500">Đang cập nhật giá</span>
                     )}
                   </div>
+
+                {/* Specs: Core, RAM, Disk */}
+                {(() => { const s = getSpecs(prod); return (s.core || s.ram || s.disk); })() && (
+                  <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+                    <span className="px-3 py-1 bg-gray-100 rounded text-sm">Core: {getSpecs(prod).core || '-'}</span>
+                    <span className="px-3 py-1 bg-gray-100 rounded text-sm">RAM: {getSpecs(prod).ram || '-'}</span>
+                    <span className="px-3 py-1 bg-gray-100 rounded text-sm">Disk: {getSpecs(prod).disk || '-'}</span>
+                  </div>
+                )}
                 </div>
 
                 {extractFeatures(prod).length > 0 && (
@@ -334,13 +361,22 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
                   <div className="flex items-baseline justify-center mb-2">
                     {prod.gia_ban ? (
                       <>
-                        <span className="text-4xl font-bold text-[#034CC9]">{prod.gia_ban}</span>
-                        <span className="text-gray-500 ml-2">{prod.don_vi || '/tháng'}</span>
+                        <span className="text-4xl font-bold text-[#034CC9]">{formatMoneyVN(prod.gia_ban)}</span>
+                        <span className="text-gray-500 ml-2">{prod.don_vi || ''}</span>
                       </>
                     ) : (
                       <span className="text-gray-500">Đang cập nhật giá</span>
                     )}
                   </div>
+
+                {/* Specs: Core, RAM, Disk */}
+                {(() => { const s = getSpecs(prod); return (s.core || s.ram || s.disk); })() && (
+                  <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
+                    <span className="px-3 py-1 bg-gray-100 rounded text-sm">Core: {getSpecs(prod).core || '-'}</span>
+                    <span className="px-3 py-1 bg-gray-100 rounded text-sm">RAM: {getSpecs(prod).ram || '-'}</span>
+                    <span className="px-3 py-1 bg-gray-100 rounded text-sm">Disk: {getSpecs(prod).disk || '-'}</span>
+                  </div>
+                )}
                 </div>
 
                 {extractFeatures(prod).length > 0 && (
@@ -383,7 +419,7 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
                     {prod.gia_ban ? (
                       <>
                         <span className="text-4xl font-bold text-[#034CC9]">{prod.gia_ban}</span>
-                        <span className="text-gray-500 ml-2">{prod.don_vi || '/tháng'}</span>
+                        <span className="text-gray-500 ml-2">{prod.don_vi || ''}</span>
                       </>
                     ) : (
                       <span className="text-gray-500">Đang cập nhật giá</span>
@@ -426,7 +462,7 @@ export default function HomePage({ onNavigate, onAddToCart }: HomePageProps) {
               <div key={post.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-shadow group cursor-pointer" onClick={() => onNavigate('blog-post', { slug: post.slug })}>
                 <div className="relative h-48 overflow-hidden">
                   <img
-                    src={post.avatar || 'https://placehold.co/600x400'}
+                    src={getBlogImageUrl(post) || post.thumbnail || post.avatar || 'https://placehold.co/600x400'}
                     alt={post.tieu_de}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
