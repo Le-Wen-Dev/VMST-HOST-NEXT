@@ -1,6 +1,8 @@
 import { Trash2, ShoppingCart, ArrowRight, Check } from 'lucide-react';
 import { HostingPlan } from '../data/mockData';
 import { formatMoneyVN } from '../utils/format';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 interface CartItem {
   plan: HostingPlan;
@@ -15,6 +17,8 @@ interface CartPageProps {
 }
 
 export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPageProps) {
+  const { isLoggedIn } = useAuth();
+  const { showWarning } = useToast();
   const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
 
   const getDurationLabel = (duration: string) => {
@@ -151,7 +155,14 @@ export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPag
                 </div>
 
                 <button
-                  onClick={() => onNavigate('checkout')}
+                  onClick={() => {
+                    if (!isLoggedIn) {
+                      showWarning('Vui lòng đăng ký tài khoản và đăng nhập để mua hàng.');
+                      onNavigate('login');
+                    } else {
+                      onNavigate('checkout');
+                    }
+                  }}
                   className="w-full bg-[#034CC9] text-white py-4 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors flex items-center justify-center mb-3"
                 >
                   Thanh toán

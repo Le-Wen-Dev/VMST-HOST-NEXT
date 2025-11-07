@@ -1,4 +1,8 @@
 User-agent: *
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /login
+Disallow: /user
 Allow: /
 
-Sitemap: http://localhost:5173/sitemap.xml
+Sitemap: https://vmst.host/sitemap.xml

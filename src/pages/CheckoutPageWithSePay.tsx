@@ -4,6 +4,8 @@ import { HostingPlan, vouchers } from '../data/mockData';
 import { createMyOrder } from '../services/orders';
 import { listProducts } from '../services/products';
 import { notifyAdminNewOrder } from '../services/adminNotifications';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 
 interface CartItem {
   plan: HostingPlan;
@@ -18,6 +20,8 @@ interface CheckoutPageProps {
 }
 
 export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }: CheckoutPageProps) {
+  const { isLoggedIn } = useAuth();
+  const { showError, showWarning } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -79,8 +83,14 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Nếu chưa đăng nhập: hiện toast và chuyển hướng về trang Login
+    if (!isLoggedIn) {
+      showWarning('Vui lòng đăng ký tài khoản và đăng nhập để mua hàng.');
+      onNavigate('login');
+      return;
+    }
     if (!formData.name || !formData.email || !formData.phone) {
-      alert('Vui lòng điền đầy đủ thông tin');
+      showError('Vui lòng điền đầy đủ thông tin bắt buộc.');
       return;
     }
 
@@ -138,7 +148,7 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
       onNavigate('payment-qr', { orderId, amount: total });
     } catch (error) {
       console.error('Create order error:', error);
-      alert('Đã có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại sau.');
+      showError('Đã có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại sau.');
     } finally {
       setIsProcessing(false);
     }
