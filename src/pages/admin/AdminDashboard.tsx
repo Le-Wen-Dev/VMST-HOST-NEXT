@@ -13,6 +13,7 @@ import ExpirationAlerts from './modules/ExpirationAlerts';
 import { ToastContainer } from '../../components/Toast';
 import ProductManagement from './modules/ProductManagement'
 import TicketManagement from './modules/TicketManagement'
+import VoucherManagement from './modules/VoucherManagement'
 
 interface AdminDashboardProps {
   onNavigate: (page: string) => void;
@@ -524,7 +525,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       case 'tickets':
         return <TicketManagement />;
       case 'vouchers':
-        return renderVouchers();
+        return <VoucherManagement />;
       case 'blog-categories':
         return <BlogCategoryManagement />;
       case 'blog':

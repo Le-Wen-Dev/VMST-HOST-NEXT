@@ -101,9 +101,9 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-br from-[#034CC9] to-[#0B2B6F] text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold mb-4">Bảng giá tổng hợp</h1>
-          <p className="text-xl text-blue-100 max-w-3xl mx-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center animate-fade-in">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3">Bảng giá tổng hợp</h1>
+          <p className="text-base sm:text-lg text-blue-100 max-w-3xl mx-auto">
             Chọn gói phù hợp với nhu cầu của bạn. Tất cả các gói đều có SLA cao và hỗ trợ 24/7
           </p>
         </div>
@@ -114,7 +114,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setCategory('all')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all hover:scale-105 ${
                 category === 'all'
                   ? 'bg-[#034CC9] text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -124,7 +124,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
             </button>
             <button
               onClick={() => setCategory('wordpress')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all hover:scale-105 ${
                 category === 'wordpress'
                   ? 'bg-[#034CC9] text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -134,7 +134,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
             </button>
             <button
               onClick={() => setCategory('business')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all hover:scale-105 ${
                 category === 'business'
                   ? 'bg-[#034CC9] text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -144,7 +144,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
             </button>
             <button
               onClick={() => setCategory('email')}
-              className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all hover:scale-105 ${
                 category === 'email'
                   ? 'bg-[#034CC9] text-white'
                   : 'bg-white text-gray-700 hover:bg-gray-100'
@@ -157,7 +157,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
           <div className="bg-white rounded-lg shadow-md p-2 inline-flex">
             <button
               onClick={() => setDuration('monthly')}
-              className={`px-4 py-2 rounded-lg font-semibold transition-colors text-sm ${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all hover:scale-105 text-xs ${
                 duration === 'monthly'
                   ? 'bg-[#034CC9] text-white'
                   : 'text-gray-700 hover:bg-gray-100'
@@ -167,7 +167,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
             </button>
             <button
               onClick={() => setDuration('quarterly')}
-              className={`px-4 py-2 rounded-lg font-semibold transition-colors text-sm ${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all hover:scale-105 text-xs ${
                 duration === 'quarterly'
                   ? 'bg-[#034CC9] text-white'
                   : 'text-gray-700 hover:bg-gray-100'
@@ -177,7 +177,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
             </button>
             <button
               onClick={() => setDuration('yearly')}
-              className={`px-4 py-2 rounded-lg font-semibold transition-colors text-sm ${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all hover:scale-105 text-xs ${
                 duration === 'yearly'
                   ? 'bg-[#034CC9] text-white'
                   : 'text-gray-700 hover:bg-gray-100'
@@ -195,12 +195,13 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPlans().map((plan) => (
+            {filteredPlans().map((plan, idx) => (
               <div
                 key={plan.id}
-                className={`bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-6 ${
+                className={`bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-5 animate-scale-in hover:scale-105 ${
                   plan.recommended ? 'border-2 border-[#034CC9] relative' : ''
                 }`}
+                style={{ animationDelay: `${idx * 0.1}s` }}
               >
                 {plan.recommended && (
                   <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
@@ -259,7 +260,7 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
 
                 <button
                   onClick={() => onAddToCart(plan, duration)}
-                  className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+                  className={`w-full py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105 ${
                     plan.recommended
                       ? 'bg-[#034CC9] text-white hover:bg-[#0B2B6F]'
                       : 'bg-white text-[#034CC9] border-2 border-[#034CC9] hover:bg-blue-50'
@@ -272,12 +273,12 @@ export default function PricingPage({ onNavigate, onAddToCart }: PricingPageProp
           </div>
         )}
 
-        <div className="mt-12 bg-white rounded-xl shadow-md p-8 text-center">
-          <h3 className="text-xl font-bold text-[#0B2B6F] mb-2">Không biết chọn gói nào?</h3>
-          <p className="text-gray-600 mb-6">Sử dụng công cụ tư vấn của chúng tôi để tìm gói phù hợp nhất</p>
+        <div className="mt-12 bg-white rounded-xl shadow-md p-6 text-center animate-fade-in">
+          <h3 className="text-lg font-bold text-[#0B2B6F] mb-2">Không biết chọn gói nào?</h3>
+          <p className="text-gray-600 text-sm mb-4">Sử dụng công cụ tư vấn của chúng tôi để tìm gói phù hợp nhất</p>
           <button
             onClick={() => onNavigate('advisor')}
-            className="bg-[#034CC9] text-white px-8 py-3 rounded-lg hover:bg-[#0B2B6F] transition-colors"
+            className="bg-[#034CC9] text-white px-6 py-2 rounded-lg text-sm hover:bg-[#0B2B6F] transition-all hover:scale-105"
           >
             Tư vấn chọn gói
           </button>

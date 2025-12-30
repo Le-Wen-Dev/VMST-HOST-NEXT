@@ -17,7 +17,8 @@ export default function PaymentQRPage({ orderId, amount, onNavigate }: PaymentQR
   const [copied, setCopied] = useState(false);
 
   const qrUrl = useMemo(() => {
-    if (!orderId || !amount) return '';
+    // Không tạo QR nếu amount = 0 hoặc không có orderId
+    if (!orderId || amount === undefined || amount === null || amount === 0) return '';
     return `https://img.vietqr.io/image/vietcombank-${BANK.accountNumber}-qr_only.png?addInfo=${encodeURIComponent(orderId)}&amount=${amount}&accountName=${encodeURIComponent(BANK.accountName)}`;
   }, [orderId, amount]);
 
@@ -31,7 +32,8 @@ export default function PaymentQRPage({ orderId, amount, onNavigate }: PaymentQR
     }
   };
 
-  if (!orderId || !amount) {
+  // Kiểm tra orderId và amount (cho phép amount = 0)
+  if (!orderId || amount === undefined || amount === null) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -44,6 +46,39 @@ export default function PaymentQRPage({ orderId, amount, onNavigate }: PaymentQR
             >
               Đi đến Đơn hàng của tôi
             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Nếu tổng tiền = 0, hiển thị thông báo đơn hàng miễn phí
+  if (amount === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-xl shadow-md p-6 text-center">
+            <div className="mb-6">
+              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Đơn hàng của bạn đã được tạo thành công!</h1>
+              <p className="text-gray-600 mb-2">Mã đơn hàng: <span className="font-semibold text-blue-600">{orderId}</span></p>
+              <p className="text-lg font-semibold text-green-600 mb-4">Tổng tiền: 0₫ (Miễn phí)</p>
+              <p className="text-gray-600 mb-6">Đơn hàng của bạn đã được kích hoạt và không cần thanh toán.</p>
+            </div>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => onNavigate('my-orders', { orderId })}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Xem Đơn hàng của tôi
+              </button>
+              <button
+                onClick={() => onNavigate('home')}
+                className="border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50"
+              >
+                Về trang chủ
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -17,6 +17,8 @@ import BlogCategoryPage from './pages/BlogCategoryPage';
 import BlogCategoriesPage from './pages/BlogCategoriesPage';
 import ContactPage from './pages/ContactPage';
 import ProfilePage from './pages/ProfilePage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import MyServicesPage from './pages/MyServicesPage';
 import MyOrdersPage from './pages/MyOrdersPage';
 import MyTicketsPage from './pages/MyTicketsPage';
@@ -27,6 +29,7 @@ import { LocaleProvider } from './contexts/LocaleContext';
 import { wordpressPlans, businessPlans, emailPlans, HostingPlan } from './data/mockData';
 import { useAuth } from './contexts/AuthContext';
 import FloatingContacts from './components/FloatingContacts';
+import SnowEffect from './components/SnowEffect';
 
 interface CartItem {
   plan: HostingPlan;
@@ -49,7 +52,17 @@ function App() {
 
   // Đồng bộ state với URL khi load và khi back/forward (popstate)
   useEffect(() => {
-    const syncFromLocation = () => {
+    const syncFromLocation = (event?: PopStateEvent) => {
+      // Nếu có state từ history, dùng state đó
+      if (event?.state && event.state.page) {
+        setCurrentPage(event.state.page);
+        if (event.state.params) {
+          setPageParams(event.state.params);
+        }
+        return;
+      }
+
+      // Nếu không có state, parse từ URL
       const path = window.location.pathname;
       if (path.startsWith('/admin')) {
         setCurrentPage('admin');
@@ -85,6 +98,8 @@ function App() {
         '/my-tickets': 'my-tickets',
         '/affiliate': 'affiliate',
         '/support': 'support',
+        '/terms': 'terms',
+        '/privacy-policy': 'privacy-policy',
       };
       if (map[path]) setCurrentPage(map[path]);
     };
@@ -120,13 +135,16 @@ function App() {
       'my-tickets': () => '/my-tickets',
       affiliate: () => '/affiliate',
       support: () => '/support',
+      terms: () => '/terms',
+      'privacy-policy': () => '/privacy-policy',
       'blog-post': (pp) => `/blog/${pp?.slug || ''}`,
       'blog-category': (pp) => `/blog/category/${pp?.category || ''}`,
       admin: () => '/admin',
     };
     const toPath = pageToPath[page]?.(params);
     if (toPath) {
-      window.history.pushState({}, '', toPath);
+      // Lưu state vào history để có thể back đúng cách
+      window.history.pushState({ page, params }, '', toPath);
     }
 
     setCurrentPage(page);
@@ -241,7 +259,7 @@ function App() {
         return <AffiliatePage onNavigate={handleNavigate} />;
 
       case 'support':
-        return <SupportPage />;
+        return <SupportPage onNavigate={handleNavigate} />;
 
       case 'blog':
         return <BlogPage onNavigate={handleNavigate} />;
@@ -258,6 +276,12 @@ function App() {
       case 'contact':
         return <ContactPage />;
 
+      case 'terms':
+        return <TermsOfServicePage />;
+
+      case 'privacy-policy':
+        return <PrivacyPolicyPage />;
+
       default:
         return <HomePage onNavigate={handleNavigate} onAddToCart={handleAddToCart} />;
     }
@@ -266,6 +290,7 @@ function App() {
   return (
     <LocaleProvider>
       <div className="min-h-screen bg-white flex flex-col">
+        {currentPage !== 'admin' && <SnowEffect />}
         {currentPage !== 'admin' && (
           <Header
             onNavigate={handleNavigate}

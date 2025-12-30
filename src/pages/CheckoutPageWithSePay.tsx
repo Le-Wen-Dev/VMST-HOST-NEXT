@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Tag, QrCode, Check } from 'lucide-react';
-import { HostingPlan, vouchers } from '../data/mockData';
+import { Tag, QrCode, Check, X } from 'lucide-react';
+import { HostingPlan } from '../data/mockData';
 import { createMyOrder } from '../services/orders';
 import { listProducts } from '../services/products';
 import { notifyAdminNewOrder } from '../services/adminNotifications';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { getVoucherByCode, calculateVoucherDiscount, updateVoucher, VoucherRecord } from '../services/vouchers';
 
 interface CartItem {
   plan: HostingPlan;
@@ -30,53 +31,63 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
     domain: ''
   });
   const [voucherCode, setVoucherCode] = useState('');
-  const [appliedVoucher, setAppliedVoucher] = useState<any>(null);
+  const [appliedVoucher, setAppliedVoucher] = useState<VoucherRecord | null>(null);
   const [voucherError, setVoucherError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
   // Không hiển thị QR tại trang checkout. Sau khi tạo đơn sẽ chuyển sang trang riêng.
   // Trang thanh toán riêng sẽ sinh QR. Checkout chỉ tạo đơn và chuyển hướng.
 
   const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
 
-  const handleApplyVoucher = () => {
-    const voucher = vouchers.find(v => v.code === voucherCode.toUpperCase() && v.active);
-
-    if (!voucher) {
-      setVoucherError('Mã voucher không hợp lệ');
-      setAppliedVoucher(null);
+  const handleApplyVoucher = async () => {
+    if (!voucherCode.trim()) {
+      setVoucherError('Vui lòng nhập mã voucher');
       return;
     }
 
-    if (subtotal < voucher.minAmount) {
-      setVoucherError(`Đơn hàng tối thiểu ${voucher.minAmount.toLocaleString('vi-VN')}₫`);
-      setAppliedVoucher(null);
-      return;
-    }
+    setIsApplyingVoucher(true);
+    setVoucherError('');
 
-    if (voucher.usedCount >= voucher.usageLimit) {
-      setVoucherError('Mã voucher đã hết lượt sử dụng');
-      setAppliedVoucher(null);
-      return;
-    }
+    try {
+      const voucher = await getVoucherByCode(voucherCode.trim());
+      
+      if (!voucher) {
+        setVoucherError('Mã voucher không hợp lệ');
+        setAppliedVoucher(null);
+        return;
+      }
 
-    setAppliedVoucher(voucher);
+      // Validate và tính toán discount
+      const validation = calculateVoucherDiscount(voucher, subtotal);
+      
+      if (!validation.isValid) {
+        setVoucherError(validation.error || 'Mã voucher không hợp lệ');
+        setAppliedVoucher(null);
+        return;
+      }
+
+      setAppliedVoucher(voucher);
+      setVoucherError('');
+    } catch (error: any) {
+      console.error('Error applying voucher:', error);
+      setVoucherError(error?.message || 'Không thể áp dụng voucher');
+      setAppliedVoucher(null);
+    } finally {
+      setIsApplyingVoucher(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherCode('');
     setVoucherError('');
   };
 
-  const calculateDiscount = () => {
-    if (!appliedVoucher) return 0;
-
-    if (appliedVoucher.type === 'percentage') {
-      return Math.min(
-        (subtotal * appliedVoucher.discountValue) / 100,
-        appliedVoucher.maxDiscount
-      );
-    }
-    return appliedVoucher.discountValue;
-  };
-
-  const discount = calculateDiscount();
-  const total = subtotal - discount;
+  const discount = appliedVoucher 
+    ? calculateVoucherDiscount(appliedVoucher, subtotal).discount 
+    : 0;
+  const total = Math.max(0, subtotal - discount);
 
   // No dynamic payment intent — we keep a fixed VietQR. Checkout simply creates the order
   // and shows instructions to transfer using the fixed QR/content.
@@ -89,8 +100,8 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
       onNavigate('login');
       return;
     }
-    if (!formData.name || !formData.email || !formData.phone) {
-      showError('Vui lòng điền đầy đủ thông tin bắt buộc.');
+    if (!formData.name || !formData.email || !formData.phone || !formData.domain) {
+      showError('Vui lòng điền đầy đủ thông tin bắt buộc (bao gồm tên miền).');
       return;
     }
 
@@ -113,12 +124,29 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
         }
       }
 
+      // Tăng số lượng đã dùng của voucher nếu có
+      if (appliedVoucher) {
+        try {
+          const currentUsed = parseInt(appliedVoucher.da_dung || '0');
+          await updateVoucher(appliedVoucher.id, {
+            da_dung: String(currentUsed + 1),
+          });
+        } catch (err) {
+          console.warn('Failed to update voucher usage count:', err);
+          // Không block checkout nếu update voucher thất bại
+        }
+      }
+
+      const voucherInfo = appliedVoucher 
+        ? ` | Voucher: ${appliedVoucher.code_giam_gia} (Giảm: ${discount.toLocaleString('vi-VN')}₫)`
+        : '';
+
       const createdOrder = await createMyOrder({
         gia_tri: String(total),
         thanh_toan: 'cho_thanh_toan',
         trang_thai_su_dung: 'tat_tam_thoi',
         san_pham: productIds.length ? productIds : undefined,
-        ghi_chu_noi_bo: `Khách: ${formData.name} | Email: ${formData.email} | Phone: ${formData.phone} | Domain: ${formData.domain || ''} | Sản phẩm: ${itemsSummary}`
+        ghi_chu_noi_bo: `Khách: ${formData.name} | Email: ${formData.email} | Phone: ${formData.phone} | Domain: ${formData.domain || ''} | Sản phẩm: ${itemsSummary}${voucherInfo} | Tạm tính: ${subtotal.toLocaleString('vi-VN')}₫ | Giảm giá: ${discount.toLocaleString('vi-VN')}₫ | Tổng: ${total.toLocaleString('vi-VN')}₫`
       });
 
       const orderId = createdOrder.ma_don_hang || createdOrder.id;
@@ -236,10 +264,11 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Tên miền (nếu có)
+                    Tên miền <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
+                    required
                     value={formData.domain}
                     onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -295,30 +324,53 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
               </div>
 
               <div className="border-t pt-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Tag className="h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={voucherCode}
-                    onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                    placeholder="Nhập mã giảm giá"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={handleApplyVoucher}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Áp dụng
-                  </button>
-                </div>
-                {voucherError && (
-                  <p className="text-sm text-red-600 mb-2">{voucherError}</p>
-                )}
-                {appliedVoucher && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-                    <p className="text-sm text-green-800 font-semibold">
-                      ✓ Mã "{appliedVoucher.code}" đã được áp dụng
-                    </p>
+                {!appliedVoucher ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-5 w-5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={voucherCode}
+                        onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                        onKeyPress={(e) => e.key === 'Enter' && handleApplyVoucher()}
+                        placeholder="Nhập mã giảm giá"
+                        disabled={isApplyingVoucher}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                      />
+                      <button
+                        onClick={handleApplyVoucher}
+                        disabled={isApplyingVoucher || !voucherCode.trim()}
+                        className="bg-[#034CC9] text-white px-4 py-2 rounded-lg hover:bg-[#0B2B6F] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-semibold"
+                      >
+                        {isApplyingVoucher ? 'Đang kiểm tra...' : 'Áp dụng'}
+                      </button>
+                    </div>
+                    {voucherError && (
+                      <p className="text-xs text-red-600 flex items-center">
+                        <X className="h-3 w-3 mr-1" />
+                        {voucherError}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-green-600" />
+                        <p className="text-sm text-green-800 font-semibold">
+                          Mã "{appliedVoucher.code_giam_gia}" đã được áp dụng
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleRemoveVoucher}
+                        className="text-red-600 hover:text-red-800 transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {appliedVoucher.ten_chien_dich && (
+                      <p className="text-xs text-green-700">{appliedVoucher.ten_chien_dich}</p>
+                    )}
                   </div>
                 )}
               </div>

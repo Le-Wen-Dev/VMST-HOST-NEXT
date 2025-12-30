@@ -141,8 +141,8 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900 mb-1">Hotline</h4>
-                    <a href="tel:0832575905" className="text-[#034CC9] hover:underline">
-                      0832 575 905
+                    <a href="tel:0822636676" className="text-[#034CC9] hover:underline">
+                      0822 636 676
                     </a>
                     <p className="text-sm text-gray-600 mt-1">24/7 hỗ trợ khách hàng</p>
                   </div>

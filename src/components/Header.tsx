@@ -23,15 +23,18 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <div className="flex items-center cursor-pointer" onClick={() => onNavigate('home')}>
-            <Server className="h-8 w-8 text-[#034CC9]" />
-            <span className="ml-2 text-xl font-bold text-[#034CC9]">VMST Host</span>
+          <div className="flex items-center cursor-pointer animate-fade-in relative" onClick={() => onNavigate('home')}>
+            <div className="relative">
+              <Server className="h-7 w-7 text-[#034CC9]" />
+              <span className="absolute -top-1 -right-1 text-lg">🎄</span>
+            </div>
+            <span className="ml-2 text-lg font-bold text-[#034CC9]">VMST Host</span>
           </div>
 
           <nav className="hidden md:flex items-center space-x-8">
             <button
               onClick={() => onNavigate('pricing')}
-              className={`text-sm font-medium transition-colors ${
+              className={`text-sm font-medium transition-all hover:scale-105 ${
                 currentPage === 'pricing' ? 'text-[#034CC9]' : 'text-gray-700 hover:text-[#034CC9]'
               }`}
             >
@@ -40,7 +43,7 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
 
             <button
               onClick={() => onNavigate('advisor')}
-              className={`text-sm font-medium transition-colors ${
+              className={`text-sm font-medium transition-all hover:scale-105 ${
                 currentPage === 'advisor' ? 'text-[#034CC9]' : 'text-gray-700 hover:text-[#034CC9]'
               }`}
             >
@@ -49,7 +52,7 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
 
             <button
               onClick={() => onNavigate('contact')}
-              className={`text-sm font-medium transition-colors ${
+              className={`text-sm font-medium transition-all hover:scale-105 ${
                 currentPage === 'contact' ? 'text-[#034CC9]' : 'text-gray-700 hover:text-[#034CC9]'
               }`}
             >
@@ -58,7 +61,7 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
 
             <button
               onClick={() => onNavigate('blog')}
-              className={`text-sm font-medium transition-colors ${
+              className={`text-sm font-medium transition-all hover:scale-105 ${
                 currentPage === 'blog' ? 'text-[#034CC9]' : 'text-gray-700 hover:text-[#034CC9]'
               }`}
             >
@@ -69,11 +72,11 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
           <div className="hidden md:flex items-center space-x-4">
             <button
               onClick={() => onNavigate('cart')}
-              className="relative p-2 text-gray-700 hover:text-[#034CC9] transition-colors"
+              className="relative p-2 text-gray-700 hover:text-[#034CC9] transition-all hover:scale-110"
             >
-              <ShoppingCart className="h-5 w-5" />
+              <ShoppingCart className="h-4 w-4" />
               {cartItemCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center animate-pulse-slow">
                   {cartItemCount}
                 </span>
               )}
@@ -82,17 +85,17 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
             {isLoggedIn ? (
               <button
                 onClick={() => onNavigate('portal')}
-                className="flex items-center text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors"
+                className="flex items-center text-xs font-medium text-gray-700 hover:text-[#034CC9] transition-all hover:scale-105"
               >
-                <User className="h-5 w-5 mr-1" />
+                <User className="h-4 w-4 mr-1" />
                 {displayName || 'Tài khoản'}
               </button>
             ) : (
               <button
                 onClick={() => onNavigate('login')}
-                className="flex items-center text-sm font-medium text-gray-700 hover:text-[#034CC9] transition-colors"
+                className="flex items-center text-xs font-medium text-gray-700 hover:text-[#034CC9] transition-all hover:scale-105"
               >
-                <User className="h-5 w-5 mr-1" />
+                <User className="h-4 w-4 mr-1" />
                 Đăng nhập
               </button>
             )}
@@ -100,7 +103,7 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
             {isAdmin ? (
               <button
                 onClick={() => onNavigate('admin')}
-                className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-700 transition-colors"
+                className="bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-orange-700 transition-all hover:scale-105"
               >
                 Admin
               </button>
@@ -108,7 +111,7 @@ export default function Header({ onNavigate, currentPage, cartItemCount = 0, isA
               !inPortalArea && (
                 <button
                   onClick={() => onNavigate('portal')}
-                  className="bg-[#034CC9] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#0B2B6F] transition-colors"
+                  className="bg-[#034CC9] text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-[#0B2B6F] transition-all hover:scale-105"
                 >
                   Portal
                 </button>

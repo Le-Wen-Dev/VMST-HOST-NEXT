@@ -22,12 +22,12 @@ export default function Footer({ onNavigate }: FooterProps) {
     <footer className="bg-[#0B2B6F] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-          <div>
-            <div className="flex items-center mb-4">
-              <Server className="h-8 w-8 text-white" />
-              <span className="ml-2 text-xl font-bold">VMST Host</span>
+          <div className="animate-fade-in">
+            <div className="flex items-center mb-3">
+              <Server className="h-6 w-6 text-white" />
+              <span className="ml-2 text-lg font-bold">VMST Host</span>
             </div>
-            <p className="text-gray-300 text-sm mb-4">
+            <p className="text-gray-300 text-xs mb-3">
               Hosting & Email Doanh nghiệp - Nhanh, An toàn, Tự động
             </p>
             <p className="text-gray-300 text-xs mb-2">
@@ -49,8 +49,8 @@ export default function Footer({ onNavigate }: FooterProps) {
             </div>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Sản phẩm</h3>
+          <div className="animate-fade-in animate-delay-100">
+            <h3 className="text-base font-semibold mb-3">Sản phẩm</h3>
             <ul className="space-y-2">
               <li>
                 <button
@@ -95,8 +95,8 @@ export default function Footer({ onNavigate }: FooterProps) {
             </ul>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Hỗ trợ</h3>
+          <div className="animate-fade-in animate-delay-200">
+            <h3 className="text-base font-semibold mb-3">Hỗ trợ</h3>
             <ul className="space-y-2">
               <li>
                 <button
@@ -123,26 +123,32 @@ export default function Footer({ onNavigate }: FooterProps) {
                 </button>
               </li>
               <li>
-                <a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">
+                <button
+                  onClick={() => onNavigate('terms')}
+                  className="text-gray-300 hover:text-white transition-colors text-sm"
+                >
                   Điều khoản dịch vụ
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#" className="text-gray-300 hover:text-white transition-colors text-sm">
+                <button
+                  onClick={() => onNavigate('privacy-policy')}
+                  className="text-gray-300 hover:text-white transition-colors text-sm"
+                >
                   Chính sách bảo mật
-                </a>
+                </button>
               </li>
             </ul>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Liên hệ</h3>
+          <div className="animate-fade-in animate-delay-300">
+            <h3 className="text-base font-semibold mb-3">Liên hệ</h3>
             <ul className="space-y-3">
               <li className="flex items-start">
                 <Phone className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
                 <div>
-                  <a href="tel:0832575905" className="text-gray-300 hover:text-white transition-colors text-sm">
-                    0832 575 905
+                  <a href="tel:0822636676" className="text-gray-300 hover:text-white transition-colors text-sm">
+                    0822 636 676
                   </a>
                 </div>
               </li>
@@ -164,9 +170,9 @@ export default function Footer({ onNavigate }: FooterProps) {
           </div>
         </div>
 
-        <div className="border-t border-gray-600 pt-8 mb-8">
+        <div className="border-t border-gray-600 pt-6 mb-6">
           <div className="max-w-2xl mx-auto">
-            <h3 className="text-lg font-semibold mb-4 text-center">Liên hệ nhanh</h3>
+            <h3 className="text-base font-semibold mb-3 text-center animate-fade-in">Liên hệ nhanh</h3>
             {submitted ? (
               <div className="bg-green-500 text-white px-4 py-3 rounded-lg text-center">
                 Cảm ơn bạn! Chúng tôi sẽ liên hệ sớm nhất.
@@ -201,7 +207,7 @@ export default function Footer({ onNavigate }: FooterProps) {
                 />
                 <button
                   type="submit"
-                  className="w-full bg-[#034CC9] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#0B2B6F] transition-colors"
+                  className="w-full bg-[#034CC9] text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-[#0B2B6F] transition-all hover:scale-105"
                 >
                   Gửi yêu cầu
                 </button>

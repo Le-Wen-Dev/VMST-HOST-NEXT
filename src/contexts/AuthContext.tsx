@@ -141,30 +141,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (code && state) {
         try {
           const codeVerifier = sessionStorage.getItem('pb_oauth_code_verifier');
-          const redirectUrl = sessionStorage.getItem('pb_oauth_redirect') || window.location.origin;
+          const redirectUrl = sessionStorage.getItem('pb_oauth_redirect') || window.location.origin + window.location.pathname;
           const oauthCollection = sessionStorage.getItem('pb_oauth_collection') || 'users';
           
-          if (codeVerifier) {
-            await pb.collection(oauthCollection).authWithOAuth2Code('google', code, codeVerifier, redirectUrl);
-            
-            // Clean up
-            sessionStorage.removeItem('pb_oauth_code_verifier');
-            sessionStorage.removeItem('pb_oauth_redirect');
-            sessionStorage.removeItem('pb_oauth_collection');
-            
-            // Clean URL
+          if (!codeVerifier) {
+            console.error('Missing code verifier in sessionStorage');
             window.history.replaceState({}, document.title, window.location.pathname);
-            
-            // Update state
-            const curUser = getCurrentUser();
-            const curToken = pb.authStore.token;
-            setUser(curUser);
-            setToken(curToken);
-            saveTokenToStorage(curToken, curUser);
-            persistCookieFromAuthStore(SEVEN_DAYS_MS / 1000);
+            return;
           }
-        } catch (error) {
+
+          if (!oauthCollection) {
+            console.error('Missing collection name in sessionStorage');
+            window.history.replaceState({}, document.title, window.location.pathname);
+            return;
+          }
+
+          // Ensure we're using the correct collection
+          const collection = pb.collection(oauthCollection);
+          
+          // Call authWithOAuth2Code with proper parameters
+          // Note: redirectUrl should match what was used in the initial auth request
+          const authData = await collection.authWithOAuth2Code(
+            'google', 
+            code, 
+            codeVerifier, 
+            redirectUrl
+          );
+          
+          // Clean up sessionStorage
+          sessionStorage.removeItem('pb_oauth_code_verifier');
+          sessionStorage.removeItem('pb_oauth_redirect');
+          sessionStorage.removeItem('pb_oauth_collection');
+          
+          // Update state from authData
+          const curUser = authData.record as UserRecord;
+          const curToken = authData.token;
+          setUser(curUser);
+          setToken(curToken);
+          saveTokenToStorage(curToken, curUser);
+          persistCookieFromAuthStore(SEVEN_DAYS_MS / 1000);
+          
+          // Clean URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+          
+          // Small delay to ensure state is updated
+          setTimeout(() => {
+            // Redirect based on user role
+            const userIsAdmin = isAdmin();
+            if (userIsAdmin) {
+              window.location.href = '/admin';
+            } else {
+              window.location.href = '/portal';
+            }
+          }, 100);
+        } catch (error: any) {
           console.error('OAuth callback error:', error);
+          // Clean up on error
+          sessionStorage.removeItem('pb_oauth_code_verifier');
+          sessionStorage.removeItem('pb_oauth_redirect');
+          sessionStorage.removeItem('pb_oauth_collection');
+          // Clean URL even on error
+          window.history.replaceState({}, document.title, window.location.pathname);
+          // Show error to user if we have toast context
+          if (error?.message) {
+            console.error('OAuth error details:', error.message);
+          }
         }
       }
     };
@@ -291,29 +332,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithGoogle = async () => {
-    // Prefer methods from 'users' collection, fallback to 'thanh_vien'
+    // Use 'users' collection (as shown in the PocketBase config)
     let methods: any;
     let collection = 'users';
-    methods = await pb.collection('users').listAuthMethods();
-    const googleUsers = methods?.authProviders?.find((p: any) => p.name === 'google');
-    if (!googleUsers) {
-      methods = await pb.collection('thanh_vien').listAuthMethods();
-      const googleTV = methods?.authProviders?.find((p: any) => p.name === 'google');
-      if (!googleTV) throw new Error('Google OAuth2 is not configured in PocketBase');
-      collection = 'thanh_vien';
-      sessionStorage.setItem('pb_oauth_code_verifier', googleTV.codeVerifier);
-      const redirectUrlTV = window.location.origin;
-      sessionStorage.setItem('pb_oauth_redirect', redirectUrlTV);
-      sessionStorage.setItem('pb_oauth_collection', 'thanh_vien');
-      window.location.href = googleTV.authUrl;
-      return;
+    
+    try {
+      methods = await pb.collection('users').listAuthMethods();
+      const googleProvider = methods?.authProviders?.find((p: any) => p.name === 'google');
+      
+      if (!googleProvider) {
+        throw new Error('Google OAuth2 provider not found in users collection');
+      }
+
+      if (!googleProvider.codeVerifier) {
+        throw new Error('Google OAuth2 codeVerifier is missing');
+      }
+
+      // Use the redirect URL from the provider or construct it
+      // PocketBase usually expects the redirect URL to match what's configured in the provider
+      const redirectUrl = googleProvider.redirectUrl || `${window.location.origin}/login`;
+      
+      // Store OAuth data in sessionStorage
+      sessionStorage.setItem('pb_oauth_code_verifier', googleProvider.codeVerifier);
+      sessionStorage.setItem('pb_oauth_redirect', redirectUrl);
+      sessionStorage.setItem('pb_oauth_collection', collection);
+      
+      // Redirect to Google OAuth
+      window.location.href = googleProvider.authUrl;
+    } catch (e: any) {
+      console.error('Google OAuth setup error:', e);
+      throw new Error(e?.message || 'Google OAuth2 chưa được cấu hình đúng trong PocketBase. Vui lòng kiểm tra lại cấu hình OAuth2 trong admin panel.');
     }
-    sessionStorage.setItem('pb_oauth_code_verifier', googleUsers.codeVerifier);
-    const redirectUrl = window.location.origin;
-    sessionStorage.setItem('pb_oauth_redirect', redirectUrl);
-    sessionStorage.setItem('pb_oauth_collection', collection);
-    // Redirect to Google OAuth
-    window.location.href = googleUsers.authUrl;
   };
 
   const value: AuthContextType = {

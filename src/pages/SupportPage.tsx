@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { MessageSquare, Paperclip, Send, AlertCircle } from 'lucide-react';
+import { MessageSquare, Paperclip, Send, AlertCircle, Ticket, BookOpen, Headphones, FileText } from 'lucide-react';
 import { mockServices } from '../data/mockData';
 
-export default function SupportPage() {
+interface SupportPageProps {
+  onNavigate?: (page: string) => void;
+}
+
+export default function SupportPage({ onNavigate }: SupportPageProps) {
   const [subject, setSubject] = useState('');
   const [department, setDepartment] = useState('technical');
   const [priority, setPriority] = useState('normal');
@@ -18,16 +22,38 @@ export default function SupportPage() {
       setMessage('');
       setService('');
       setSubmitted(false);
-    }, 3000);
+      // Điều hướng tới trang ticket sau khi tạo thành công
+      if (onNavigate) {
+        onNavigate('my-tickets');
+      }
+    }, 2000);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 animate-fade-in">
           <MessageSquare className="h-16 w-16 text-[#034CC9] mx-auto mb-4" />
-          <h1 className="text-4xl font-bold text-[#0B2B6F] mb-4">Trung tâm hỗ trợ</h1>
-          <p className="text-xl text-gray-600">Chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-[#0B2B6F] mb-4">Trung tâm hỗ trợ</h1>
+          <p className="text-lg sm:text-xl text-gray-600">Chúng tôi luôn sẵn sàng hỗ trợ bạn 24/7</p>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mb-8 flex flex-wrap justify-center gap-4">
+          <button
+            onClick={() => onNavigate && onNavigate('my-tickets')}
+            className="bg-[#034CC9] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#0B2B6F] transition-all hover:scale-105 inline-flex items-center"
+          >
+            <Ticket className="h-4 w-4 mr-2" />
+            Xem ticket của tôi
+          </button>
+          <button
+            onClick={() => onNavigate && onNavigate('blog')}
+            className="bg-white border-2 border-[#034CC9] text-[#034CC9] px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-all hover:scale-105 inline-flex items-center"
+          >
+            <BookOpen className="h-4 w-4 mr-2" />
+            Hướng dẫn & FAQ
+          </button>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6 mb-12">
@@ -62,8 +88,8 @@ export default function SupportPage() {
               </svg>
             </div>
             <h3 className="font-semibold text-[#0B2B6F] mb-2">Hotline</h3>
-            <p className="text-sm text-gray-600 mb-4">0832 575 905</p>
-            <a href="tel:0832575905" className="text-[#034CC9] font-semibold hover:underline">
+            <p className="text-sm text-gray-600 mb-4">0822 636 676</p>
+            <a href="tel:0822636676" className="text-[#034CC9] font-semibold hover:underline">
               Gọi ngay
             </a>
           </div>
