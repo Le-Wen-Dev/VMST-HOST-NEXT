@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect as ReactUseEffect } from 'react';
+import React from 'react';
 import { Tag, QrCode, Check, X } from 'lucide-react';
 import { HostingPlan } from '../data/mockData';
 import { createMyOrder } from '../services/orders';
@@ -7,11 +8,14 @@ import { notifyAdminNewOrder } from '../services/adminNotifications';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { getVoucherByCode, calculateVoucherDiscount, updateVoucher, VoucherRecord } from '../services/vouchers';
+import { checkStudentEmail, markStudentEmailUsed } from '../services/studentVouchers';
 
 interface CartItem {
   plan: HostingPlan;
   duration: string;
   price: number;
+  months?: number; // Số tháng đã chọn
+  basePrice?: number; // Đơn giá gốc (theo tháng)
 }
 
 interface CheckoutPageProps {
@@ -21,7 +25,7 @@ interface CheckoutPageProps {
 }
 
 export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }: CheckoutPageProps) {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const { showError, showWarning } = useToast();
   const [formData, setFormData] = useState({
     name: '',
@@ -35,10 +39,26 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
   const [voucherError, setVoucherError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
+  const [localCart, setLocalCart] = useState<CartItem[]>(cart);
   // Không hiển thị QR tại trang checkout. Sau khi tạo đơn sẽ chuyển sang trang riêng.
   // Trang thanh toán riêng sẽ sinh QR. Checkout chỉ tạo đơn và chuyển hướng.
 
-  const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
+  // Sync cart from props and initialize basePrice/months
+  ReactUseEffect(() => {
+    setLocalCart(cart.map(item => ({
+      ...item,
+      basePrice: item.basePrice || item.plan.price.monthly,
+      months: item.months || 1,
+      price: (item.basePrice || item.plan.price.monthly) * (item.months || 1)
+    })));
+  }, [cart]);
+
+  // Calculate subtotal from localCart with updated prices
+  const subtotal = localCart.reduce((sum, item) => {
+    const basePrice = item.basePrice || item.plan.price.monthly;
+    const months = item.months || 1;
+    return sum + (basePrice * months);
+  }, 0);
 
   const handleApplyVoucher = async () => {
     if (!voucherCode.trim()) {
@@ -56,6 +76,38 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
         setVoucherError('Mã voucher không hợp lệ');
         setAppliedVoucher(null);
         return;
+      }
+
+      // Kiểm tra nếu là voucher sinh viên VOVANMY2026
+      if (voucher.code_giam_gia.toUpperCase() === 'VOVANMY2026') {
+        // Phải đăng nhập để dùng voucher sinh viên
+        if (!isLoggedIn || !user?.email) {
+          setVoucherError('Vui lòng đăng nhập để sử dụng voucher sinh viên');
+          setAppliedVoucher(null);
+          return;
+        }
+
+        // Kiểm tra email có trong danh sách sinh viên
+        try {
+          const checkResult = await checkStudentEmail(user.email);
+          
+          if (!checkResult.allowed) {
+            setVoucherError('Email của bạn không nằm trong danh sách sinh viên được phép sử dụng voucher này');
+            setAppliedVoucher(null);
+            return;
+          }
+
+          if (checkResult.used) {
+            setVoucherError('Email này đã sử dụng voucher rồi. Mỗi sinh viên chỉ được sử dụng 1 lần.');
+            setAppliedVoucher(null);
+            return;
+          }
+        } catch (error: any) {
+          console.error('Error checking student email:', error);
+          setVoucherError('Không thể kiểm tra quyền sử dụng voucher. Vui lòng thử lại.');
+          setAppliedVoucher(null);
+          return;
+        }
       }
 
       // Validate và tính toán discount
@@ -108,13 +160,18 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
     setIsProcessing(true);
     try {
       // Tóm tắt gói dịch vụ khách mua để hiển thị ở ghi chú nội bộ cho admin
-      const itemsSummary = cart
-        .map(ci => `${ci.plan.name} - ${ci.price.toLocaleString('vi-VN')}₫ - ${ci.duration}`)
+      const itemsSummary = localCart
+        .map(ci => {
+          const basePrice = ci.basePrice || ci.plan.price.monthly;
+          const months = ci.months || 1;
+          const finalPrice = basePrice * months;
+          return `${ci.plan.name} - ${finalPrice.toLocaleString('vi-VN')}₫ - ${ci.duration || `${months} tháng`}`;
+        })
         .join('; ');
 
       // Tìm id sản phẩm trong PocketBase theo tên gói để liên kết vào đơn
       const productIds: string[] = [];
-      for (const ci of cart) {
+      for (const ci of localCart) {
         try {
           const res = await listProducts({ perPage: 5, search: ci.plan.name });
           const exact = res.items.find(p => p.ten_san_pham.trim().toLowerCase() === ci.plan.name.trim().toLowerCase());
@@ -143,13 +200,30 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
 
       const createdOrder = await createMyOrder({
         gia_tri: String(total),
-        thanh_toan: 'cho_thanh_toan',
-        trang_thai_su_dung: 'tat_tam_thoi',
+        thanh_toan: total === 0 ? 'da_thanh_toan' : 'cho_thanh_toan',
+        trang_thai_su_dung: total === 0 ? 'dang_su_dung' : 'tat_tam_thoi',
         san_pham: productIds.length ? productIds : undefined,
         ghi_chu_noi_bo: `Khách: ${formData.name} | Email: ${formData.email} | Phone: ${formData.phone} | Domain: ${formData.domain || ''} | Sản phẩm: ${itemsSummary}${voucherInfo} | Tạm tính: ${subtotal.toLocaleString('vi-VN')}₫ | Giảm giá: ${discount.toLocaleString('vi-VN')}₫ | Tổng: ${total.toLocaleString('vi-VN')}₫`
       });
 
       const orderId = createdOrder.ma_don_hang || createdOrder.id;
+
+      // Nếu sử dụng voucher sinh viên VOVANMY2026
+      // - Nếu total = 0: đánh dấu email ngay (vì không cần thanh toán)
+      // - Nếu total > 0: đánh dấu khi thanh toán thành công (qua webhook)
+      if (appliedVoucher && appliedVoucher.code_giam_gia.toUpperCase() === 'VOVANMY2026' && user?.email) {
+        if (total === 0) {
+          // Đơn hàng miễn phí, đánh dấu ngay
+          try {
+            await markStudentEmailUsed(user.email, orderId);
+            console.log(`[student-voucher] Marked email ${user.email} as used for free order ${orderId}`);
+          } catch (err) {
+            console.warn('[student-voucher] Failed to mark email as used:', err);
+            // Không block checkout nếu lỗi
+          }
+        }
+        // Nếu total > 0, sẽ được đánh dấu khi thanh toán thành công qua webhook
+      }
 
       // Notify admin about new order
       try {
@@ -163,7 +237,12 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
               company: formData.company,
               domain: formData.domain,
             },
-            items: cart.map(ci => ({ name: ci.plan.name, duration: ci.duration, price: ci.price })),
+            items: localCart.map(ci => {
+              const basePrice = ci.basePrice || ci.plan.price.monthly;
+              const months = ci.months || 1;
+              const finalPrice = basePrice * months;
+              return { name: ci.plan.name, duration: ci.duration || `${months} tháng`, price: finalPrice };
+            }),
             totals: { subtotal, discount, total },
           }
         );
@@ -312,15 +391,54 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
               </div>
 
               <div className="space-y-4">
-                {cart.map((item, index) => (
-                  <div key={index} className="flex justify-between text-sm">
-                    <div>
-                      <p className="font-semibold text-gray-900">{item.plan.name}</p>
-                      <p className="text-gray-600">{item.duration}</p>
+                {localCart.map((item, index) => {
+                  const basePrice = item.basePrice || item.plan.price.monthly;
+                  const months = item.months || 1;
+                  const currentPrice = basePrice * months;
+                  
+                  return (
+                    <div key={index} className="border-b pb-4 last:border-b-0">
+                      <div className="flex justify-between text-sm mb-2">
+                        <div>
+                          <p className="font-semibold text-gray-900">{item.plan.name}</p>
+                          <p className="text-gray-600 text-xs mt-1">Đơn giá: {basePrice.toLocaleString()}₫/tháng</p>
+                        </div>
+                        <p className="font-semibold text-gray-900">{currentPrice.toLocaleString()}₫</p>
+                      </div>
+                      <div className="mt-2">
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">
+                          Thời gian sử dụng
+                        </label>
+                        <select
+                          value={months}
+                          onChange={(e) => {
+                            const newMonths = parseInt(e.target.value);
+                            const newPrice = basePrice * newMonths;
+                            // Update local cart item
+                            const updatedCart = [...localCart];
+                            updatedCart[index] = {
+                              ...updatedCart[index],
+                              months: newMonths,
+                              price: newPrice,
+                              basePrice: basePrice,
+                              duration: newMonths === 1 ? '1 tháng' : newMonths === 3 ? '3 tháng' : newMonths === 6 ? '6 tháng' : newMonths === 12 ? '1 năm' : `${newMonths} tháng`
+                            };
+                            setLocalCart(updatedCart);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                        >
+                          <option value={1}>1 tháng</option>
+                          <option value={3}>3 tháng</option>
+                          <option value={6}>6 tháng</option>
+                          <option value={12}>1 năm (12 tháng)</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Tổng: {currentPrice.toLocaleString()}₫ ({basePrice.toLocaleString()}₫ × {months} tháng)
+                        </p>
+                      </div>
                     </div>
-                    <p className="font-semibold text-gray-900">{item.price.toLocaleString()}₫</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="border-t pt-4">

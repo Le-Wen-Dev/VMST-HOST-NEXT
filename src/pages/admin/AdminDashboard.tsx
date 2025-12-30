@@ -14,6 +14,7 @@ import { ToastContainer } from '../../components/Toast';
 import ProductManagement from './modules/ProductManagement'
 import TicketManagement from './modules/TicketManagement'
 import VoucherManagement from './modules/VoucherManagement'
+import StudentVoucherManagement from './modules/StudentVoucherManagement'
 
 interface AdminDashboardProps {
   onNavigate: (page: string) => void;
@@ -87,6 +88,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     { id: 'affiliate', label: 'Affiliate', icon: Link2 },
     { id: 'tickets', label: 'Tickets', icon: Ticket },
     { id: 'vouchers', label: 'Vouchers', icon: Tag },
+    { id: 'student-vouchers', label: 'Voucher Sinh viên', icon: Users },
     { id: 'blog-categories', label: 'Danh mục Blog', icon: Tag },
     { id: 'blog', label: 'Blog', icon: FileText },
     { id: 'users', label: 'Người dùng', icon: Users },
@@ -526,6 +528,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         return <TicketManagement />;
       case 'vouchers':
         return <VoucherManagement />;
+      case 'student-vouchers':
+        return <StudentVoucherManagement />;
       case 'blog-categories':
         return <BlogCategoryManagement />;
       case 'blog':

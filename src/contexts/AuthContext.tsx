@@ -218,39 +218,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const emailNormalized = email.trim().toLowerCase();
+    
+    // Try both collections in parallel for faster response
+    const usersPromise = pb.collection('users').authWithPassword(emailNormalized, password).catch((e) => ({ error: e }));
+    const thanhVienPromise = pb.collection('thanh_vien').authWithPassword(emailNormalized, password).catch((e) => ({ error: e }));
+    
     try {
-      // Try auth against 'users' first (per API docs)
-      const authData = await pb.collection('users').authWithPassword(emailNormalized, password);
-      const userRecord = authData.record as UserRecord;
-      setUser(userRecord);
-      setToken(authData.token);
-      saveTokenToStorage(authData.token, userRecord);
-      persistCookieFromAuthStore(SEVEN_DAYS_MS / 1000);
-      return userRecord;
-    } catch (e1: any) {
-      // Fallback to custom 'thanh_vien' collection
-      try {
-        const authData2 = await pb.collection('thanh_vien').authWithPassword(emailNormalized, password);
-        const userRecord2 = authData2.record as UserRecord;
+      // Wait for both, but use the first successful one
+      const [usersResult, thanhVienResult] = await Promise.all([usersPromise, thanhVienPromise]);
+      
+      // Try 'users' first
+      if (!('error' in usersResult)) {
+        const userRecord = usersResult.record as UserRecord;
+        setUser(userRecord);
+        setToken(usersResult.token);
+        saveTokenToStorage(usersResult.token, userRecord);
+        persistCookieFromAuthStore(SEVEN_DAYS_MS / 1000);
+        return userRecord;
+      }
+      
+      // Fallback to 'thanh_vien'
+      if (!('error' in thanhVienResult)) {
+        const userRecord2 = thanhVienResult.record as UserRecord;
         setUser(userRecord2);
-        setToken(authData2.token);
-        saveTokenToStorage(authData2.token, userRecord2);
+        setToken(thanhVienResult.token);
+        saveTokenToStorage(thanhVienResult.token, userRecord2);
         persistCookieFromAuthStore(SEVEN_DAYS_MS / 1000);
         return userRecord2;
-      } catch (e2: any) {
-        // Surface detailed error from PocketBase
-        const data = e1?.data?.data || e2?.data?.data || e2?.data || e1?.data;
-        if (data && typeof data === 'object') {
-          const messages: string[] = [];
-          for (const key of Object.keys(data)) {
-            const field = (data as any)[key];
-            const msg = field?.message || field;
-            if (msg) messages.push(`${key}: ${msg}`);
-          }
-          throw new Error(messages.join(', '));
-        }
-        throw new Error(e2?.message || e1?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
       }
+      
+      // Both failed, throw the more descriptive error
+      const e1 = (usersResult as any).error;
+      const e2 = (thanhVienResult as any).error;
+      const data = e1?.data?.data || e2?.data?.data || e2?.data || e1?.data;
+      if (data && typeof data === 'object') {
+        const messages: string[] = [];
+        for (const key of Object.keys(data)) {
+          const field = (data as any)[key];
+          const msg = field?.message || field;
+          if (msg) messages.push(`${key}: ${msg}`);
+        }
+        throw new Error(messages.join(', '));
+      }
+      throw new Error(e2?.message || e1?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+    } catch (error: any) {
+      // Re-throw if it's already an Error, otherwise wrap it
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
     }
   };
 

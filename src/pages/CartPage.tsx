@@ -1,10 +1,8 @@
-import { useState } from 'react';
-import { Trash2, ShoppingCart, ArrowRight, Check, Tag, X } from 'lucide-react';
+import { Trash2, ShoppingCart, ArrowRight, Check } from 'lucide-react';
 import { HostingPlan } from '../data/mockData';
 import { formatMoneyVN } from '../utils/format';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { getVoucherByCode, calculateVoucherDiscount, VoucherRecord } from '../services/vouchers';
 
 interface CartItem {
   plan: HostingPlan;
@@ -22,60 +20,7 @@ export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPag
   const { isLoggedIn } = useAuth();
   const { showWarning, showError, showSuccess } = useToast();
   const subtotal = cart.reduce((sum, item) => sum + item.price, 0);
-  
-  const [voucherCode, setVoucherCode] = useState('');
-  const [appliedVoucher, setAppliedVoucher] = useState<VoucherRecord | null>(null);
-  const [voucherError, setVoucherError] = useState('');
-  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
-
-  const handleApplyVoucher = async () => {
-    if (!voucherCode.trim()) {
-      setVoucherError('Vui lòng nhập mã voucher');
-      return;
-    }
-
-    setIsApplyingVoucher(true);
-    setVoucherError('');
-
-    try {
-      const voucher = await getVoucherByCode(voucherCode.trim());
-      
-      if (!voucher) {
-        setVoucherError('Mã voucher không hợp lệ');
-        setAppliedVoucher(null);
-        return;
-      }
-
-      const validation = calculateVoucherDiscount(voucher, subtotal);
-      
-      if (!validation.isValid) {
-        setVoucherError(validation.error || 'Mã voucher không hợp lệ');
-        setAppliedVoucher(null);
-        return;
-      }
-
-      setAppliedVoucher(voucher);
-      setVoucherError('');
-      showSuccess('Áp dụng voucher thành công!');
-    } catch (error: any) {
-      console.error('Error applying voucher:', error);
-      setVoucherError(error?.message || 'Không thể áp dụng voucher');
-      setAppliedVoucher(null);
-    } finally {
-      setIsApplyingVoucher(false);
-    }
-  };
-
-  const handleRemoveVoucher = () => {
-    setAppliedVoucher(null);
-    setVoucherCode('');
-    setVoucherError('');
-  };
-
-  const discount = appliedVoucher 
-    ? calculateVoucherDiscount(appliedVoucher, subtotal).discount 
-    : 0;
-  const total = Math.max(0, subtotal - discount);
+  const total = subtotal;
 
   const getDurationLabel = (duration: string) => {
     if (duration === 'monthly') return '1 tháng';
@@ -193,70 +138,11 @@ export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPag
               <div className="bg-white rounded-xl shadow-md p-6 sticky top-24">
                 <h2 className="text-xl font-bold text-[#0B2B6F] mb-6">Tóm tắt đơn hàng</h2>
 
-                {/* Voucher Section */}
-                <div className="mb-6 pb-6 border-b">
-                  {!appliedVoucher ? (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Tag className="h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={voucherCode}
-                          onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-                          onKeyPress={(e) => e.key === 'Enter' && handleApplyVoucher()}
-                          placeholder="Mã giảm giá"
-                          disabled={isApplyingVoucher}
-                          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#034CC9] disabled:bg-gray-100"
-                        />
-                        <button
-                          onClick={handleApplyVoucher}
-                          disabled={isApplyingVoucher || !voucherCode.trim()}
-                          className="bg-[#034CC9] text-white px-3 py-2 rounded-lg hover:bg-[#0B2B6F] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-xs font-semibold"
-                        >
-                          {isApplyingVoucher ? '...' : 'Áp dụng'}
-                        </button>
-                      </div>
-                      {voucherError && (
-                        <p className="text-xs text-red-600 flex items-center">
-                          <X className="h-3 w-3 mr-1" />
-                          {voucherError}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Check className="h-4 w-4 text-green-600" />
-                          <p className="text-xs text-green-800 font-semibold">
-                            {appliedVoucher.code_giam_gia}
-                          </p>
-                        </div>
-                        <button
-                          onClick={handleRemoveVoucher}
-                          className="text-red-600 hover:text-red-800 transition-colors"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </div>
-                      {appliedVoucher.ten_chien_dich && (
-                        <p className="text-xs text-green-700">{appliedVoucher.ten_chien_dich}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between text-gray-700">
                     <span>Tạm tính</span>
                     <span className="font-semibold">{formatMoneyVN(subtotal)}đ</span>
                   </div>
-                  {discount > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Giảm giá</span>
-                      <span className="font-semibold">-{formatMoneyVN(discount)}đ</span>
-                    </div>
-                  )}
                   <div className="flex justify-between text-gray-700">
                     <span>VAT (0%)</span>
                     <span className="font-semibold">0₫</span>

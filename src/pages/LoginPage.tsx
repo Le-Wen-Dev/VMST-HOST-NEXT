@@ -14,11 +14,15 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [showRegister, setShowRegister] = useState(false);
   const [reg, setReg] = useState({ name: '', email: '', password: '', confirm: '' });
+  const [isLoading, setIsLoading] = useState(false);
   const { login, isAdmin, loginWithGoogle, forgotPassword, register } = useAuth();
   const { showSuccess, showError, showInfo } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+    
+    setIsLoading(true);
     try {
       await login(email, password);
       showSuccess('Đăng nhập thành công!');
@@ -30,6 +34,8 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
     } catch (err) {
       showError('Đăng nhập thất bại. Vui lòng kiểm tra email/mật khẩu.');
       console.error(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -149,9 +155,17 @@ export default function LoginPage({ onNavigate }: LoginPageProps) {
 
             <button
               type="submit"
-              className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors"
+              disabled={isLoading}
+              className="w-full bg-[#034CC9] text-white py-3 rounded-lg font-semibold hover:bg-[#0B2B6F] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center"
             >
-              Đăng nhập
+              {isLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Đang đăng nhập...
+                </>
+              ) : (
+                'Đăng nhập'
+              )}
             </button>
           </form>
 
