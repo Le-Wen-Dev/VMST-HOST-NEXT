@@ -220,8 +220,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const emailNormalized = email.trim().toLowerCase();
     
     // Try both collections in parallel for faster response
-    const usersPromise = pb.collection('users').authWithPassword(emailNormalized, password).catch((e) => ({ error: e }));
-    const thanhVienPromise = pb.collection('thanh_vien').authWithPassword(emailNormalized, password).catch((e) => ({ error: e }));
+    // Wrap in catch to handle 404 (collection doesn't exist) gracefully
+    const usersPromise = pb.collection('users').authWithPassword(emailNormalized, password).catch((e) => {
+      // Don't log 404 errors as they're expected if collection doesn't exist
+      if (e?.status !== 404 && e?.code !== 404) {
+        console.debug('[Auth] users collection auth failed:', e?.status || e?.code, e?.message);
+      }
+      return { error: e };
+    });
+    const thanhVienPromise = pb.collection('thanh_vien').authWithPassword(emailNormalized, password).catch((e) => {
+      // Don't log 404 errors as they're expected if collection doesn't exist
+      if (e?.status !== 404 && e?.code !== 404) {
+        console.debug('[Auth] thanh_vien collection auth failed:', e?.status || e?.code, e?.message);
+      }
+      return { error: e };
+    });
     
     try {
       // Wait for both, but use the first successful one

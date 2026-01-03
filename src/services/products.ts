@@ -22,10 +22,20 @@ async function ensureProductsAuth() {
     const normalizedEmail = (email || '').trim().toLowerCase();
     productsAuthPromise = (async () => {
       try {
+        if (!normalizedEmail || !password) {
+          console.warn('[Products] Admin credentials missing, skipping auth');
+          return;
+        }
         await pbProducts.admins.authWithPassword(normalizedEmail, password);
+        console.log('[Products] Admin auth successful');
       } catch (err: any) {
         // Log and allow unauthenticated fallback
-        console.warn('Products admin auth failed:', err?.message || err);
+        const status = err?.status || err?.code;
+        const message = err?.message || 'Unknown error';
+        console.warn(`[Products] Admin auth failed (${status}):`, message);
+        console.warn('[Products] Will continue without admin auth - some operations may fail');
+        // Reset promise to allow retry
+        productsAuthPromise = null;
       }
     })();
   }

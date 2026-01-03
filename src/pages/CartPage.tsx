@@ -28,6 +28,73 @@ export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPag
     return '12 tháng';
   };
 
+  // Lấy thông tin Backup từ features (từ admin checkboxes)
+  const getBackupInfo = (plan: HostingPlan): string => {
+    if (!Array.isArray(plan.features) || plan.features.length === 0) {
+      // Fallback: kiểm tra plan.backup nếu có
+      return plan.backup || 'Không có';
+    }
+    
+    // Tìm các từ khóa liên quan đến backup trong features array
+    const backupKeywords = ['Daily Backups', 'Backup', 'backup', 'Backups', 'Hàng ngày', 'Hàng tuần'];
+    const backupFeature = plan.features.find(f => {
+      const featureStr = String(f).toLowerCase();
+      return backupKeywords.some(keyword => featureStr.includes(keyword.toLowerCase()));
+    });
+    
+    if (backupFeature) {
+      // Extract thông tin từ feature
+      const featureStr = String(backupFeature).toLowerCase();
+      if (featureStr.includes('daily') || featureStr.includes('hàng ngày')) return 'Hàng ngày';
+      if (featureStr.includes('weekly') || featureStr.includes('hàng tuần')) return 'Hàng tuần';
+      if (featureStr.includes('monthly') || featureStr.includes('hàng tháng')) return 'Hàng tháng';
+      // Trả về feature gốc nếu không match pattern nào
+      return String(backupFeature);
+    }
+    
+    // Fallback: kiểm tra plan.backup nếu có
+    if (plan.backup) {
+      return plan.backup;
+    }
+    
+    return 'Không có';
+  };
+
+  // Lấy thông tin Hỗ trợ từ features (từ admin checkboxes)
+  const getSupportInfo = (plan: HostingPlan): string => {
+    if (!Array.isArray(plan.features) || plan.features.length === 0) {
+      // Fallback: kiểm tra plan.support nếu có
+      return plan.support || 'Không có';
+    }
+    
+    // Tìm các từ khóa liên quan đến support trong features array
+    const supportKeywords = ['VIP Support 24/7', 'VIP Support', 'Support', 'support', '24/7', 'Hỗ trợ'];
+    const supportFeature = plan.features.find(f => {
+      const featureStr = String(f).toLowerCase();
+      return supportKeywords.some(keyword => featureStr.includes(keyword.toLowerCase()));
+    });
+    
+    if (supportFeature) {
+      // Extract thông tin từ feature
+      const featureStr = String(supportFeature).toLowerCase();
+      if (featureStr.includes('vip support 24/7') || (featureStr.includes('vip') && featureStr.includes('24/7'))) {
+        return 'VIP 24/7';
+      }
+      if (featureStr.includes('24/7')) return '24/7';
+      if (featureStr.includes('vip')) return 'VIP 24/7';
+      if (featureStr.includes('priority') || featureStr.includes('ưu tiên')) return 'Ưu tiên 24/7';
+      // Trả về feature gốc nếu không match pattern nào
+      return String(supportFeature);
+    }
+    
+    // Fallback: kiểm tra plan.support nếu có
+    if (plan.support) {
+      return plan.support;
+    }
+    
+    return 'Không có';
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -98,11 +165,11 @@ export default function CartPage({ cart, onRemoveFromCart, onNavigate }: CartPag
                           )}
                           <div>
                             <p className="text-gray-500">Backup</p>
-                            <p className="font-semibold text-gray-900">{item.plan.backup}</p>
+                            <p className="font-semibold text-gray-900">{getBackupInfo(item.plan)}</p>
                           </div>
                           <div>
                             <p className="text-gray-500">Hỗ trợ</p>
-                            <p className="font-semibold text-gray-900">{item.plan.support}</p>
+                            <p className="font-semibold text-gray-900">{getSupportInfo(item.plan)}</p>
                           </div>
                           <div>
                             <p className="text-gray-500">SLA</p>
