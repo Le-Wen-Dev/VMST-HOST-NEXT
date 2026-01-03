@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đơn hàng mới - VMST Host</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f4f4f4;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 20px auto;
+      background: #ffffff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      background: linear-gradient(135deg, #034CC9 0%, #0B2B6F 100%);
+      color: white;
+      padding: 30px 20px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    .header p {
+      margin: 10px 0 0 0;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+    .content {
+      padding: 30px;
+    }
+    .section {
+      background: #f9f9f9;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      border-left: 4px solid #034CC9;
+    }
+    .section h2 {
+      margin: 0 0 15px 0;
+      color: #034CC9;
+      font-size: 18px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    .info-item {
+      padding: 10px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    .info-item:last-child {
+      border-bottom: none;
+    }
+    .info-label {
+      font-weight: 600;
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 5px;
+    }
+    .info-value {
+      color: #333;
+      font-size: 15px;
+      word-break: break-word;
+    }
+    .info-value strong {
+      color: #034CC9;
+      font-size: 16px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-success {
+      background: #d4edda;
+      color: #155724;
+    }
+    .badge-warning {
+      background: #fff3cd;
+      color: #856404;
+    }
+    .badge-info {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+    .badge-danger {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      background: white;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .items-table thead {
+      background: #034CC9;
+      color: white;
+    }
+    .items-table th {
+      padding: 12px;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .items-table td {
+      padding: 12px;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 14px;
+    }
+    .items-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .items-table tbody tr:hover {
+      background: #f5f5f5;
+    }
+    .total-box {
+      background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+      padding: 25px;
+      border-radius: 8px;
+      margin-top: 20px;
+      text-align: center;
+      border: 2px solid #28a745;
+    }
+    .total-label {
+      font-size: 14px;
+      color: #155724;
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+    .total-amount {
+      font-size: 32px;
+      font-weight: bold;
+      color: #155724;
+    }
+    .summary-box {
+      background: #fff3cd;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      border-left: 4px solid #ffc107;
+    }
+    .summary-box h3 {
+      margin: 0 0 15px 0;
+      color: #856404;
+      font-size: 16px;
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #ffeaa7;
+    }
+    .summary-row:last-child {
+      border-bottom: none;
+      font-weight: bold;
+      font-size: 16px;
+      color: #856404;
+      margin-top: 10px;
+      padding-top: 15px;
+      border-top: 2px solid #ffc107;
+    }
+    .action-box {
+      background: #f8d7da;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      border-left: 4px solid #dc3545;
+    }
+    .action-box h3 {
+      margin: 0 0 10px 0;
+      color: #721c24;
+      font-size: 16px;
+    }
+    .action-box p {
+      margin: 0;
+      color: #721c24;
+      font-size: 14px;
+    }
+    .footer {
+      background: #f8f9fa;
+      padding: 20px;
+      text-align: center;
+      color: #666;
+      font-size: 12px;
+      border-top: 1px solid #e0e0e0;
+    }
+    .footer p {
+      margin: 5px 0;
+    }
+    .icon {
+      font-size: 20px;
+    }
+    @media only screen and (max-width: 600px) {
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+      .email-container {
+        margin: 10px;
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🚀 Đơn hàng mới từ VMST Host</h1>
+      <p>Thông báo đơn hàng mới - Hệ thống tự động</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- Thông tin đơn hàng -->
+      <div class="section">
+        <h2><span class="icon">📋</span> Thông tin đơn hàng</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">Mã đơn hàng</div>
+            <div class="info-value"><strong>{{order_code}}</strong></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">ID đơn hàng</div>
+            <div class="info-value">{{order_id}}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Trạng thái</div>
+            <div class="info-value">
+              <span class="badge badge-info">{{order_status}}</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Thanh toán</div>
+            <div class="info-value">
+              <span class="badge badge-warning">{{payment_status}}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thông tin khách hàng -->
+      <div class="section">
+        <h2><span class="icon">👤</span> Thông tin khách hàng</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">Họ tên</div>
+            <div class="info-value"><strong>{{customer_name}}</strong></div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Email</div>
+            <div class="info-value">{{customer_email}}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Số điện thoại</div>
+            <div class="info-value">{{customer_phone}}</div>
+          </div>
+          {{#customer_company}}
+          <div class="info-item">
+            <div class="info-label">Công ty</div>
+            <div class="info-value">{{customer_company}}</div>
+          </div>
+          {{/customer_company}}
+          {{#customer_domain}}
+          <div class="info-item">
+            <div class="info-label">Domain</div>
+            <div class="info-value">{{customer_domain}}</div>
+          </div>
+          {{/customer_domain}}
+        </div>
+      </div>
+
+      <!-- Chi tiết sản phẩm -->
+      <div class="section">
+        <h2><span class="icon">🛒</span> Chi tiết đơn hàng</h2>
+        <div style="white-space: pre-line; font-family: 'Courier New', monospace; background: white; padding: 15px; border-radius: 5px; border: 1px solid #e0e0e0; font-size: 13px; line-height: 1.8;">
+{{message}}
+        </div>
+      </div>
+
+      <!-- Tổng kết -->
+      <div class="summary-box">
+        <h3>💰 Tổng kết đơn hàng</h3>
+        <div class="summary-row">
+          <span>Tạm tính:</span>
+          <span>{{subtotal_amount}}</span>
+        </div>
+        <div class="summary-row">
+          <span>Giảm giá:</span>
+          <span style="color: #28a745;">-{{discount_amount}}</span>
+        </div>
+        <div class="summary-row">
+          <span>Tổng thành tiền:</span>
+          <span>{{total_amount}}</span>
+        </div>
+      </div>
+
+      <!-- Tổng tiền nổi bật -->
+      <div class="total-box">
+        <div class="total-label">Tổng thành tiền</div>
+        <div class="total-amount">{{total_amount}}</div>
+      </div>
+
+      <!-- Hành động cần thiết -->
+      <div class="action-box">
+        <h3>⚠️ Hành động cần thiết</h3>
+        <p>Vui lòng soạn đơn và liên hệ khách hàng để kích hoạt dịch vụ ngay.</p>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p><strong>VMST Host</strong> - Hệ thống quản lý hosting chuyên nghiệp</p>
+      <p>Email này được gửi tự động từ hệ thống. Vui lòng không trả lời email này.</p>
+      <p style="margin-top: 10px; color: #999;">Thời gian: {{current_date}}</p>
+    </div>
+  </div>
+</body>
+</html>
+

@@ -7,11 +7,6 @@ export default function FloatingContacts() {
 
   return (
     <div className="fixed right-6 bottom-28 z-50 flex flex-col items-end gap-3">
-      {/* Hotline label */}
-      <div className="bg-white shadow-lg rounded-full px-4 py-2 text-sm font-semibold text-gray-800 border border-gray-200">
-        Hotline: {hotline}
-      </div>
-
       {/* Icons stack */}
       <div className="flex flex-col gap-3">
         {/* Zalo */}
