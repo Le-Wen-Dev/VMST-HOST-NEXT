@@ -26,7 +26,7 @@ interface CheckoutPageProps {
 
 export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }: CheckoutPageProps) {
   const { isLoggedIn, user } = useAuth();
-  const { showError, showWarning } = useToast();
+  const { showError, showWarning, showSuccess } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -110,6 +110,44 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
         }
       }
 
+      // Kiểm tra nếu là voucher THAYVOVANMY2026 - chỉ áp dụng cho sản phẩm cụ thể
+      if (voucher.code_giam_gia.toUpperCase() === 'THAYVOVANMY2026' || voucher.id === 'ec9g4exsuulzloe') {
+        const ALLOWED_PRODUCT_ID = 'r0oxf1j3clqha2g';
+        
+        // Kiểm tra tất cả sản phẩm trong giỏ hàng
+        const invalidProducts: string[] = [];
+        
+        for (const item of localCart) {
+          // Lấy product_id từ plan.id hoặc tìm kiếm
+          let productId: string | null = null;
+          
+          // Thử lấy từ plan.id trước (nếu plan.id là product_id từ PocketBase)
+          if (item.plan.id && item.plan.id !== item.plan.name) {
+            productId = item.plan.id;
+          } else {
+            // Nếu không có, tìm kiếm theo tên
+            try {
+              const res = await listProducts({ perPage: 5, search: item.plan.name });
+              const exact = res.items.find(p => p.ten_san_pham.trim().toLowerCase() === item.plan.name.trim().toLowerCase());
+              if (exact) productId = exact.id;
+            } catch (err) {
+              console.warn('Không thể lấy product_id:', err);
+            }
+          }
+          
+          // Kiểm tra product_id
+          if (!productId || productId !== ALLOWED_PRODUCT_ID) {
+            invalidProducts.push(item.plan.name);
+          }
+        }
+        
+        if (invalidProducts.length > 0) {
+          setVoucherError(`Voucher này chỉ áp dụng cho sản phẩm cụ thể. Vui lòng xóa các sản phẩm khác khỏi giỏ hàng.`);
+          setAppliedVoucher(null);
+          return;
+        }
+      }
+
       // Validate và tính toán discount
       const validation = calculateVoucherDiscount(voucher, subtotal);
       
@@ -178,6 +216,19 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
           if (exact) productIds.push(exact.id);
         } catch (err) {
           console.warn('Không thể lấy sản phẩm để liên kết đơn:', err);
+        }
+      }
+
+      // Kiểm tra lại điều kiện voucher THAYVOVANMY2026 trước khi checkout
+      if (appliedVoucher && (appliedVoucher.code_giam_gia.toUpperCase() === 'THAYVOVANMY2026' || appliedVoucher.id === 'ec9g4exsuulzloe')) {
+        const ALLOWED_PRODUCT_ID = 'r0oxf1j3clqha2g';
+        
+        // Kiểm tra tất cả sản phẩm phải là sản phẩm được phép
+        const invalidProducts = productIds.filter(id => id !== ALLOWED_PRODUCT_ID);
+        if (invalidProducts.length > 0 || productIds.length === 0 || !productIds.every(id => id === ALLOWED_PRODUCT_ID)) {
+          showError('Voucher này chỉ áp dụng cho sản phẩm cụ thể. Vui lòng xóa các sản phẩm khác khỏi giỏ hàng.');
+          setIsProcessing(false);
+          return;
         }
       }
 
@@ -251,6 +302,10 @@ export default function CheckoutPageWithSePay({ cart, onClearCart, onNavigate }:
       }
 
       onClearCart();
+      
+      // Hiển thị thông báo thành công
+      showSuccess('Vui lòng đợi trong giây lát, sản phẩm sẽ được khởi tạo và gửi qua email cho bạn.');
+      
       // Chuyển hướng tới trang riêng hiển thị mã QR
       onNavigate('payment-qr', { orderId, amount: total });
     } catch (error) {

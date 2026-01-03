@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Snowflake {
   id: number;
@@ -11,7 +11,6 @@ interface Snowflake {
 
 export default function SnowEffect() {
   const [snowflakes, setSnowflakes] = useState<Snowflake[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const createSnowflakes = () => {
@@ -33,51 +32,6 @@ export default function SnowEffect() {
     };
 
     createSnowflakes();
-
-    // Thêm nhạc giáng sinh "Merry Christmas"
-    // Ưu tiên sử dụng file local nếu có, nếu không thì dùng URL online
-    const audioUrl = '/merry-christmas.mp3'; // File local trong public folder
-    const fallbackUrl = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'; // URL dự phòng
-    
-    const audio = new Audio(audioUrl);
-    
-    // Xử lý lỗi nếu file local không tồn tại, chuyển sang URL dự phòng
-    audio.addEventListener('error', () => {
-      console.log('Không tìm thấy file nhạc local, sử dụng URL dự phòng');
-      if (audioRef.current) {
-        audioRef.current.src = fallbackUrl;
-        audioRef.current.play().catch(() => {
-          console.log('Nhạc giáng sinh sẽ phát khi người dùng tương tác với trang');
-        });
-      }
-    });
-    
-    audio.loop = true;
-    audio.volume = 0.1; // Volume 10%
-    audioRef.current = audio;
-
-    // Tự động phát nhạc khi người dùng tương tác
-    const handleUserInteraction = () => {
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          console.log('Nhạc giáng sinh sẽ phát khi người dùng tương tác với trang');
-        });
-      }
-      // Xóa listener sau lần đầu
-      document.removeEventListener('click', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-    };
-
-    document.addEventListener('click', handleUserInteraction);
-    document.addEventListener('touchstart', handleUserInteraction);
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
   }, []);
 
   return (
