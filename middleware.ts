@@ -11,17 +11,6 @@ function isAdminRoute(pathname: string): boolean {
   return ADMIN_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'));
 }
 
-function decodeJwtPayload(token: string): Record<string, any> | null {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1]));
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -30,11 +19,12 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const pbAuth = req.cookies.get('pb_auth')?.value;
+  // Use lightweight pb_token cookie, fallback to pb_auth
+  const token = req.cookies.get('pb_token')?.value || req.cookies.get('pb_auth')?.value;
 
   // Protected routes: require authentication
   if (isProtectedRoute(pathname)) {
-    if (!pbAuth) {
+    if (!token) {
       const loginUrl = new URL('/login', req.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
@@ -43,28 +33,15 @@ export function middleware(req: NextRequest) {
 
   // Admin routes: require admin role
   if (isAdminRoute(pathname)) {
-    if (!pbAuth) {
+    if (!token) {
       const loginUrl = new URL('/login', req.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
 
-    // Decode JWT to check admin role
-    try {
-      const authData = JSON.parse(pbAuth);
-      const token = authData?.token;
-      if (token) {
-        const payload = decodeJwtPayload(token);
-        const model = authData?.model || authData?.record;
-        const role = model?.vai_tro || payload?.vai_tro;
-        if (role !== 'admin') {
-          return NextResponse.redirect(new URL('/', req.url));
-        }
-      } else {
-        return NextResponse.redirect(new URL('/login', req.url));
-      }
-    } catch {
-      return NextResponse.redirect(new URL('/login', req.url));
+    const role = req.cookies.get('pb_role')?.value;
+    if (role !== 'admin') {
+      return NextResponse.redirect(new URL('/', req.url));
     }
   }
 

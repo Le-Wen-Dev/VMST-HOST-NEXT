@@ -7,7 +7,7 @@ import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { processOrder, registerDARoutes } from './da-middleware.js';
+import { registerDARoutes } from './da-middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -222,11 +222,6 @@ app.post('/api/sepay', async (req, res) => {
     });
 
     console.log(`[SePay] Order ${matchedCode} → da_thanh_toan`);
-
-    // Auto-provision DirectAdmin hosting (background, không block response)
-    processOrder(orderRecord.id, pb).catch(err => {
-      console.error(`[DA] Auto-provision failed for ${matchedCode}:`, err.message);
-    });
 
     // Gửi email xác nhận thanh toán cho khách
     const ghiChu = orderRecord.ghi_chu_noi_bo || '';
