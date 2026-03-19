@@ -368,15 +368,20 @@ function loadTokenFromStorage() {
 }
 function persistCookieFromAuthStore(maxAgeSeconds) {
     try {
-        // Persist to cookie so services/pocketbase.ts can load immediately on app start
+        // Full pb_auth cookie for PocketBase SDK
         const cookie = __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$pocketbase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["pb"].authStore.exportToCookie({
             httpOnly: false,
-            secure: false,
+            secure: true,
             sameSite: 'Lax',
             path: '/',
             maxAge: maxAgeSeconds
         });
         document.cookie = cookie;
+        // Lightweight cookie for middleware auth check (avoids 4KB limit)
+        const model = __TURBOPACK__imported__module__$5b$project$5d2f$services$2f$pocketbase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["pb"].authStore.model;
+        const role = model?.vai_tro || '';
+        document.cookie = `pb_token=${__TURBOPACK__imported__module__$5b$project$5d2f$services$2f$pocketbase$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["pb"].authStore.token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
+        document.cookie = `pb_role=${role}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
     } catch  {}
 }
 function clearAuthCookie() {
@@ -386,6 +391,8 @@ function clearAuthCookie() {
             maxAge: -1
         });
         document.cookie = cookie;
+        document.cookie = 'pb_token=; path=/; max-age=-1';
+        document.cookie = 'pb_role=; path=/; max-age=-1';
     } catch  {}
 }
 function AuthProvider({ children }) {
@@ -643,7 +650,7 @@ function AuthProvider({ children }) {
         children: children
     }, void 0, false, {
         fileName: "[project]/contexts/AuthContext.tsx",
-        lineNumber: 360,
+        lineNumber: 367,
         columnNumber: 10
     }, this);
 }

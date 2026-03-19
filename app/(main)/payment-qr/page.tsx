@@ -1,58 +1,18 @@
 'use client';
 
 import { QrCode, Copy, CheckCircle2, Loader2 } from 'lucide-react';
-import { useState, useEffect, useMemo, useRef, Suspense, useCallback } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getToken } from '@/services/pocketbase';
-import QRCode from 'qrcode';
 
 const BANK = {
   bankName: 'ACB',
-  bankBin: '970416', // ACB NAPAS BIN
   accountNumber: '24086051',
   accountName: 'MAI LE QUEL',
 };
 
 const POLL_INTERVAL = 5000;
 const MAX_POLLS = 120;
-
-// Build VietQR EMVCo string
-function buildVietQRData(bankBin: string, accountNumber: string, amount: number, addInfo: string): string {
-  const tlv = (id: string, value: string) => `${id}${String(value.length).padStart(2, '0')}${value}`;
-
-  const guid = tlv('00', 'A000000727');
-  const bankBinTlv = tlv('01', bankBin);
-  const accTlv = tlv('02', accountNumber);
-  const bankData = tlv('38', guid + bankBinTlv + accTlv);
-
-  let qr = '';
-  qr += tlv('00', '01');           // Payload Format Indicator
-  qr += tlv('01', '12');           // Point of Initiation (dynamic)
-  qr += bankData;                  // Merchant Account Info
-  qr += tlv('52', '0000');         // MCC
-  qr += tlv('53', '704');          // Currency (VND)
-  qr += tlv('54', String(amount)); // Amount
-  qr += tlv('58', 'VN');           // Country
-  qr += tlv('62', tlv('08', addInfo)); // Additional Data (Bill Number = order code)
-
-  // CRC placeholder
-  qr += '6304';
-  const crc = crc16CCITT(qr);
-  qr += crc;
-  return qr;
-}
-
-function crc16CCITT(str: string): string {
-  let crc = 0xFFFF;
-  for (let i = 0; i < str.length; i++) {
-    crc ^= str.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) {
-      crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
-      crc &= 0xFFFF;
-    }
-  }
-  return crc.toString(16).toUpperCase().padStart(4, '0');
-}
 
 function PaymentQRContent() {
   const router = useRouter();
@@ -65,16 +25,9 @@ function PaymentQRContent() {
   const pollRef = useRef(0);
   const [countdown, setCountdown] = useState(60);
 
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
-
-  // Generate QR client-side (instant, no external API)
-  useEffect(() => {
-    if (!orderId || !amount || amount === 0) return;
-    const data = buildVietQRData(BANK.bankBin, BANK.accountNumber, amount, orderId);
-    QRCode.toDataURL(data, { width: 300, margin: 2, errorCorrectionLevel: 'M' })
-      .then(url => setQrDataUrl(url))
-      .catch(err => console.error('QR generation failed:', err));
-  }, [orderId, amount]);
+  const qrUrl = orderId && amount
+    ? `https://qr.sepay.vn/img?acc=${BANK.accountNumber}&bank=${BANK.bankName}&amount=${amount}&des=${encodeURIComponent(orderId)}`
+    : '';
 
   // Poll trạng thái đơn hàng
   useEffect(() => {
@@ -235,13 +188,7 @@ function PaymentQRContent() {
                 <p className="text-sm text-gray-600">Quét bằng ứng dụng ngân hàng để điền sẵn nội dung và số tiền</p>
               </div>
             </div>
-            {qrDataUrl ? (
-              <img src={qrDataUrl} alt={`VietQR - ${BANK.bankName} ${BANK.accountNumber}`} className="w-full max-w-xs rounded-lg border" />
-            ) : (
-              <div className="w-full max-w-xs aspect-square rounded-lg border flex items-center justify-center bg-gray-50">
-                <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
-              </div>
-            )}
+            <img src={qrUrl} alt={`VietQR - ${BANK.bankName} ${BANK.accountNumber}`} className="w-full max-w-xs rounded-lg border" />
             <p className="text-xs text-gray-500 mt-2 text-center">
               Mã đơn hàng: <span className="font-semibold">{orderId}</span> • Số tiền: <span className="font-semibold">{amount.toLocaleString('vi-VN')}₫</span>
             </p>

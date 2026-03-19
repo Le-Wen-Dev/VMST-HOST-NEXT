@@ -40,26 +40,17 @@ function isProtectedRoute(pathname) {
 function isAdminRoute(pathname) {
     return ADMIN_ROUTES.some((route)=>pathname === route || pathname.startsWith(route + '/'));
 }
-function decodeJwtPayload(token) {
-    try {
-        const parts = token.split('.');
-        if (parts.length !== 3) return null;
-        const payload = JSON.parse(atob(parts[1]));
-        return payload;
-    } catch  {
-        return null;
-    }
-}
 function middleware(req) {
     const { pathname } = req.nextUrl;
     // Skip API routes and static files
     if (pathname.startsWith('/api/') || pathname.startsWith('/_next/') || pathname.includes('.')) {
         return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].next();
     }
-    const pbAuth = req.cookies.get('pb_auth')?.value;
+    // Use lightweight pb_token cookie, fallback to pb_auth
+    const token = req.cookies.get('pb_token')?.value || req.cookies.get('pb_auth')?.value;
     // Protected routes: require authentication
     if (isProtectedRoute(pathname)) {
-        if (!pbAuth) {
+        if (!token) {
             const loginUrl = new URL('/login', req.url);
             loginUrl.searchParams.set('redirect', pathname);
             return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(loginUrl);
@@ -67,27 +58,14 @@ function middleware(req) {
     }
     // Admin routes: require admin role
     if (isAdminRoute(pathname)) {
-        if (!pbAuth) {
+        if (!token) {
             const loginUrl = new URL('/login', req.url);
             loginUrl.searchParams.set('redirect', pathname);
             return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(loginUrl);
         }
-        // Decode JWT to check admin role
-        try {
-            const authData = JSON.parse(pbAuth);
-            const token = authData?.token;
-            if (token) {
-                const payload = decodeJwtPayload(token);
-                const model = authData?.model || authData?.record;
-                const role = model?.vai_tro || payload?.vai_tro;
-                if (role !== 'admin') {
-                    return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL('/', req.url));
-                }
-            } else {
-                return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL('/login', req.url));
-            }
-        } catch  {
-            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL('/login', req.url));
+        const role = req.cookies.get('pb_role')?.value;
+        if (role !== 'admin') {
+            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL('/', req.url));
         }
     }
     return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].next();

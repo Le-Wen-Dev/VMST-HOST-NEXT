@@ -442,8 +442,8 @@ function MyOrdersContent() {
             const sorted = [
                 ...res.items
             ].sort((a, b)=>{
-                const ta = new Date(a.created || 0).getTime();
-                const tb = new Date(b.created || 0).getTime();
+                const ta = new Date(a.ngay_dat_hang || a.updated || 0).getTime();
+                const tb = new Date(b.ngay_dat_hang || b.updated || 0).getTime();
                 return tb - ta;
             });
             setOrders(sorted);
@@ -478,7 +478,7 @@ function MyOrdersContent() {
                     } else if (typeof o.san_pham === 'string') {
                         productName = o.san_pham;
                     }
-                    const rawOrderDate = o.ngay_dat_hang || o?._raw?.ngay_dat_hang || o.created_at || o.created || o?._raw?.created;
+                    const rawOrderDate = o.ngay_dat_hang || o.updated;
                     const normalizedOrderDate = typeof rawOrderDate === 'string' ? rawOrderDate.replace(' ', 'T') : rawOrderDate;
                     const orderDate = rawOrderDate ? new Date(normalizedOrderDate).toLocaleDateString('vi-VN') : '';
                     const totalText = o.gia_tri || '-';

@@ -55,13 +55,46 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$pocketbase$2
 ;
 ;
 const PB_URL = process.env.PB_URL || ("TURBOPACK compile-time value", "https://api.vmst.host") || 'https://api.vmst.host';
+const ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL || 'admin@vmst.host';
+const ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD || 'admin@!@#';
+// Singleton — cache admin PB client + token across requests
+let cachedPb = null;
+let authPromise = null;
+async function authenticatePb() {
+    const pb = new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$pocketbase$2f$dist$2f$pocketbase$2e$es$2e$mjs__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"](PB_URL);
+    pb.autoCancellation(false);
+    try {
+        await pb.collection('_superusers').authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD);
+    } catch  {
+        try {
+            await pb.admins.authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD);
+        } catch  {
+            console.error('[pb-admin] All admin auth methods failed');
+        }
+    }
+    return pb;
+}
 function createAdminPb() {
     const pb = new __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$pocketbase$2f$dist$2f$pocketbase$2e$es$2e$mjs__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"](PB_URL);
     pb.autoCancellation(false);
     return pb;
 }
 async function getAdminPb() {
-    return createAdminPb();
+    if (cachedPb && cachedPb.authStore.isValid) {
+        return cachedPb;
+    }
+    // Deduplicate concurrent auth calls
+    if (!authPromise) {
+        authPromise = authenticatePb().then((pb)=>{
+            cachedPb = pb;
+            authPromise = null;
+            return pb;
+        }).catch((err)=>{
+            authPromise = null;
+            throw err;
+        });
+    }
+    return authPromise;
 }
 }),
 "[project]/app/api/admin/orders/route.ts [app-route] (ecmascript)", ((__turbopack_context__) => {
