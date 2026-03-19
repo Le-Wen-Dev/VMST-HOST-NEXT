@@ -1,0 +1,324 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { listProducts } from '@/services/products';
+import { useCart } from '@/contexts/CartContext';
+import { HostingPlan } from '@/data/mockData';
+import SeoContent from '@/components/SeoContent';
+import { seoData } from '@/data/seo-articles';
+
+export default function PricingPage() {
+  const router = useRouter();
+  const { addToCart } = useCart();
+  const [duration, setDuration] = useState<'monthly' | 'quarterly' | 'yearly'>('yearly');
+  const [category, setCategory] = useState<'all' | 'wordpress' | 'business' | 'email'>('all');
+  const [dynamicPlans, setDynamicPlans] = useState<HostingPlan[]>([]);
+  const [faqOpenIndex, setFaqOpenIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    const normalizeCategory = (dm: string): 'wordpress' | 'business' | 'email' => {
+      const s = (dm || '').toLowerCase().trim();
+      if (s.includes('wordpress') || s.includes('wp')) return 'wordpress';
+      if (s.includes('email') || s.includes('mail')) return 'email';
+      if (s.includes('vps') || s.includes('server') || s.includes('cloud')) return 'business';
+      return 'business';
+    };
+
+    const loadProducts = async () => {
+      try {
+        const res = await listProducts({ perPage: 50, status: 'active' });
+        const mapped: HostingPlan[] = (res.items || []).map((r: any) => {
+          const thongSo = r.thong_so || {};
+          const gia = parseInt(r.gia_ban || '0');
+          const type = normalizeCategory(r.danh_muc || '');
+          const features = Array.isArray(r.tinh_nang) ? r.tinh_nang : [];
+          if (thongSo['Core']) features.push(`Core: ${thongSo['Core']}`);
+          if (thongSo['RAM']) features.push(`RAM: ${thongSo['RAM']}`);
+          if (thongSo['DBs']) features.push(`DBs: ${thongSo['DBs']}`);
+          if (thongSo['Network']) features.push(`Network: ${thongSo['Network']}`);
+          if (thongSo['Network Mbps']) features.push(`Network: ${thongSo['Network Mbps']} Mbps`);
+
+          const storage = thongSo['Dung lượng'] || thongSo['DL'] || thongSo['Storage'] || '';
+          const bandwidth = thongSo['Băng thông'] || thongSo['BW'] || thongSo['Bandwidth'] || '';
+          const websites = parseInt(thongSo['Domains'] || thongSo['Websites'] || '0') || 0;
+          const emails = thongSo['Email'] ? (parseInt(thongSo['Email']) || undefined) : undefined;
+
+          return {
+            id: r.id,
+            name: r.ten_san_pham || 'Sản phẩm',
+            type,
+            storage,
+            bandwidth,
+            websites,
+            emails,
+            ssl: true,
+            backup: 'Hằng ngày',
+            support: '24/7',
+            sla: '99.9%',
+            price: { monthly: gia, quarterly: gia, yearly: gia },
+            unit: r.don_vi || '',
+            features,
+            recommended: false,
+          } as HostingPlan;
+        });
+        setDynamicPlans(mapped);
+      } catch (err) {
+        setDynamicPlans([]);
+      }
+    };
+    loadProducts();
+  }, []);
+
+  const getPriceByDuration = (plan: HostingPlan) => {
+    return plan.price[duration];
+  };
+
+  const filteredPlans = () => {
+    if (dynamicPlans.length === 0) return [];
+    if (category === 'all') return dynamicPlans;
+    return dynamicPlans.filter(p => p.type === (category === 'wordpress' ? 'wordpress' : category === 'email' ? 'email' : 'business'));
+  };
+
+  const handleAddToCart = (plan: HostingPlan, dur: string) => {
+    addToCart(plan, dur);
+    router.push('/cart');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-gradient-to-br from-[#034CC9] to-[#0B2B6F] text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center animate-fade-in">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3">Bảng giá Hosting – So sánh gói WordPress, VPS, Email doanh nghiệp</h1>
+          <p className="text-base sm:text-lg text-blue-100 max-w-3xl mx-auto">
+            So sánh chi tiết giá và tính năng các gói Hosting WordPress, VPS doanh nghiệp, Email theo tên miền. Cam kết giá tốt nhất thị trường.
+          </p>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setCategory('all')}
+              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all hover:scale-105 ${
+                category === 'all' ? 'bg-[#034CC9] text-white' : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Tất cả
+            </button>
+            <button
+              onClick={() => setCategory('wordpress')}
+              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all hover:scale-105 ${
+                category === 'wordpress' ? 'bg-[#034CC9] text-white' : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Wordpress max speed
+            </button>
+            <button
+              onClick={() => setCategory('business')}
+              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all hover:scale-105 ${
+                category === 'business' ? 'bg-[#034CC9] text-white' : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              VPS
+            </button>
+            <button
+              onClick={() => setCategory('email')}
+              className={`px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all hover:scale-105 ${
+                category === 'email' ? 'bg-[#034CC9] text-white' : 'bg-white text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Email
+            </button>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-md p-2 inline-flex">
+            <button
+              onClick={() => setDuration('monthly')}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all hover:scale-105 text-xs ${
+                duration === 'monthly' ? 'bg-[#034CC9] text-white' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Tháng
+            </button>
+            <button
+              onClick={() => setDuration('quarterly')}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all hover:scale-105 text-xs ${
+                duration === 'quarterly' ? 'bg-[#034CC9] text-white' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              3 tháng
+            </button>
+            <button
+              onClick={() => setDuration('yearly')}
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all hover:scale-105 text-xs ${
+                duration === 'yearly' ? 'bg-[#034CC9] text-white' : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              Năm (-20%)
+            </button>
+          </div>
+        </div>
+
+        {filteredPlans().length === 0 ? (
+          <div className="bg-white rounded-xl shadow-md p-8 text-center">
+            <h2 className="text-2xl font-bold text-[#0B2B6F] mb-2">Chưa có sản phẩm</h2>
+            <p className="text-gray-600">Vui lòng quay lại sau hoặc liên hệ hỗ trợ để được tư vấn.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPlans().map((plan, idx) => (
+              <div
+                key={plan.id}
+                className={`bg-white rounded-xl shadow-md hover:shadow-lg transition-all p-5 animate-scale-in hover:scale-105 ${
+                  plan.recommended ? 'border-2 border-[#034CC9] relative' : ''
+                }`}
+                style={{ animationDelay: `${idx * 0.1}s` }}
+              >
+                {plan.recommended && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-[#034CC9] text-white px-4 py-1 rounded-full text-xs font-semibold">
+                      Phổ biến
+                    </span>
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <span className="text-sm text-gray-500 uppercase tracking-wide">
+                    {plan.type === 'wordpress' ? 'Wordpress max speed' : plan.type === 'business' ? 'VPS' : 'Email'}
+                  </span>
+                  <h3 className="text-2xl font-bold text-[#0B2B6F] mt-1">{plan.name}</h3>
+                </div>
+
+                <div className="mb-6">
+                  <div className="flex items-baseline">
+                    <span className="text-4xl font-bold text-[#034CC9]">
+                      {getPriceByDuration(plan).toLocaleString('vi-VN')}₫
+                    </span>
+                    <span className="text-gray-500 ml-2 text-sm">{(plan as any).unit || ''}</span>
+                  </div>
+                </div>
+
+                <ul className="space-y-3 mb-6">
+                  <li className="flex items-center text-sm">
+                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                    <span className="text-gray-700">{plan.storage} Storage</span>
+                  </li>
+                  <li className="flex items-center text-sm">
+                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                    <span className="text-gray-700">{plan.bandwidth} Bandwidth</span>
+                  </li>
+                  {plan.websites > 0 && (
+                    <li className="flex items-center text-sm">
+                      <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                      <span className="text-gray-700">{plan.websites} Websites</span>
+                    </li>
+                  )}
+                  {plan.emails !== undefined && (
+                    <li className="flex items-center text-sm">
+                      <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                      <span className="text-gray-700">{plan.emails} Email Accounts</span>
+                    </li>
+                  )}
+                  <li className="flex items-center text-sm">
+                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                    <span className="text-gray-700">SLA {plan.sla}</span>
+                  </li>
+                  <li className="flex items-center text-sm">
+                    <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                    <span className="text-gray-700">{plan.backup}</span>
+                  </li>
+                </ul>
+
+                <button
+                  onClick={() => handleAddToCart(plan, duration)}
+                  className={`w-full py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105 ${
+                    plan.recommended
+                      ? 'bg-[#034CC9] text-white hover:bg-[#0B2B6F]'
+                      : 'bg-white text-[#034CC9] border-2 border-[#034CC9] hover:bg-blue-50'
+                  }`}
+                >
+                  Chọn gói
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-12 bg-white rounded-xl shadow-md p-6 text-center animate-fade-in">
+          <h3 className="text-lg font-bold text-[#0B2B6F] mb-2">Không biết chọn gói nào?</h3>
+          <p className="text-gray-600 text-sm mb-4">Sử dụng công cụ tư vấn của chúng tôi để tìm gói phù hợp nhất</p>
+          <a
+            href="/advisor"
+            className="bg-[#034CC9] text-white px-6 py-2 rounded-lg text-sm hover:bg-[#0B2B6F] transition-all hover:scale-105 inline-block"
+          >
+            Tư vấn chọn gói
+          </a>
+        </div>
+
+        <div className="mt-12 bg-white rounded-xl shadow-md p-6">
+          <h2 className="text-xl font-bold text-[#0B2B6F] mb-6">Câu hỏi thường gặp về giá Hosting</h2>
+          <div className="divide-y divide-gray-100">
+            {[
+              {
+                q: 'Hosting giá rẻ có đảm bảo chất lượng không?',
+                a: 'Có. Tất cả các gói hosting của chúng tôi đều chạy trên ổ cứng SSD NVMe tốc độ cao, đảm bảo uptime 99.9% theo SLA, và được hỗ trợ kỹ thuật 24/7. Giá tốt không đồng nghĩa với chất lượng kém — chúng tôi tối ưu chi phí vận hành để mang lại giá trị thực sự cho khách hàng.',
+              },
+              {
+                q: 'Nên chọn gói Hosting nào cho website mới?',
+                a: 'Nếu bạn mới bắt đầu với WordPress, hãy chọn gói WordPress Hosting — được tối ưu sẵn với LiteSpeed, dễ cài đặt và quản lý. Nếu bạn cần chạy ứng dụng tùy chỉnh hoặc nhiều công nghệ khác nhau, gói Business Hosting (VPS) sẽ phù hợp hơn.',
+              },
+              {
+                q: 'Có được dùng thử trước khi mua không?',
+                a: 'Chúng tôi cung cấp chính sách hoàn tiền trong 7 ngày nếu bạn không hài lòng với dịch vụ. Bạn có thể đăng ký, trải nghiệm thực tế và yêu cầu hoàn tiền trong vòng 7 ngày kể từ ngày kích hoạt.',
+              },
+              {
+                q: 'Thanh toán bằng hình thức nào?',
+                a: 'Hiện tại chúng tôi hỗ trợ thanh toán qua chuyển khoản ngân hàng với mã QR VietQR (Vietcombank). Đơn hàng được xác nhận tự động qua hệ thống SePay ngay sau khi thanh toán thành công — không cần chờ xác nhận thủ công.',
+              },
+              {
+                q: 'Có mã giảm giá cho sinh viên không?',
+                a: 'Có. Chúng tôi có chương trình voucher dành riêng cho sinh viên. Liên hệ hỗ trợ hoặc kiểm tra trang ưu đãi để nhận mã giảm giá áp dụng cho các gói Hosting sinh viên.',
+              },
+            ].map((item, i) => (
+              <div key={i} className="py-4">
+                <button
+                  className="w-full flex justify-between items-center text-left gap-4"
+                  onClick={() => setFaqOpenIndex(faqOpenIndex === i ? null : i)}
+                >
+                  <span className="font-semibold text-[#0B2B6F] text-sm sm:text-base">{item.q}</span>
+                  <ChevronDown
+                    className={`h-5 w-5 text-[#034CC9] flex-shrink-0 transition-transform duration-200 ${faqOpenIndex === i ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {faqOpenIndex === i && (
+                  <p className="mt-3 text-gray-600 text-sm leading-relaxed">{item.a}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-12 bg-white rounded-xl shadow-md p-6">
+          <h2 className="text-lg font-bold text-[#0B2B6F] mb-4">Tìm hiểu chi tiết từng gói</h2>
+          <div className="grid md:grid-cols-3 gap-4">
+            <a href="/wordpress-hosting" className="block p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">
+              <h3 className="font-semibold text-[#0B2B6F] mb-1">WordPress Hosting</h3>
+              <p className="text-sm text-gray-600">Tối ưu cho WordPress với LiteSpeed</p>
+            </a>
+            <a href="/business-hosting" className="block p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">
+              <h3 className="font-semibold text-[#0B2B6F] mb-1">Hosting doanh nghiệp</h3>
+              <p className="text-sm text-gray-600">VPS hiệu năng cao, đa công nghệ</p>
+            </a>
+            <a href="/email-domain" className="block p-4 bg-blue-50 rounded-xl hover:bg-blue-100 transition-colors">
+              <h3 className="font-semibold text-[#0B2B6F] mb-1">Email doanh nghiệp</h3>
+              <p className="text-sm text-gray-600">Email theo tên miền, anti-spam</p>
+            </a>
+          </div>
+        </div>
+      </div>
+      <SeoContent {...seoData.pricing} />
+    </div>
+  );
+}

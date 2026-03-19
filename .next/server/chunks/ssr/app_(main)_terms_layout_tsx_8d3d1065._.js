@@ -1,0 +1,3 @@
+module.exports=[308,a=>{"use strict";var b=a.i(7997);function c({children:a}){return(0,b.jsx)(b.Fragment,{children:a})}a.s(["default",()=>c,"metadata",0,{title:"Điều khoản dịch vụ – VMST Host",description:"Điều khoản sử dụng dịch vụ hosting, VPS, email doanh nghiệp tại VMST Host. Quy định về thanh toán, hoàn tiền, bảo hành dịch vụ.",alternates:{canonical:"https://vmst.host/terms"}}])}];
+
+//# sourceMappingURL=app_%28main%29_terms_layout_tsx_8d3d1065._.js.map

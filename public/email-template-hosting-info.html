@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thông tin đơn hàng - VMST Host</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f4f8;font-family:'Segoe UI',Roboto,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f4f8;padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:#ffffff;padding:28px 40px;text-align:center;border-bottom:1px solid #e2e8f0;">
+              <img src="https://vmst.host/image/logo-vmst-ne.svg" alt="VMST Host" width="160" height="36" style="display:inline-block;" />
+              <p style="color:#718096;margin:6px 0 0;font-size:13px;">Giải pháp Hosting chuyên nghiệp</p>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding:32px 40px 8px;">
+              <p style="color:#1a1a1a;font-size:16px;margin:0;line-height:1.7;">Kính gửi Quý khách hàng,</p>
+              <p style="color:#4a5568;font-size:15px;margin:12px 0 0;line-height:1.7;">
+                Đây là email xác nhận rằng <strong style="color:#034CC9;">Công Ty TNHH Giải Pháp Công Nghệ VMST Việt Nam</strong> đã nhận được đơn đặt hàng của Quý khách với các thông tin chi tiết như sau:
+              </p>
+            </td>
+          </tr>
+
+          <!-- Order Info -->
+          <tr>
+            <td style="padding:16px 40px;">
+              <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#EBF4FF;border-radius:12px;border-left:4px solid #034CC9;">
+                <tr>
+                  <td style="padding:20px 24px;">
+                    <p style="color:#0B2B6F;font-size:16px;margin:0;font-weight:700;">Mã số đơn hàng: {{MA_DON_HANG}}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+<!-- PLACEHOLDER_PART2 -->
+
+          <!-- Order Details -->
+          <tr>
+            <td style="padding:8px 40px 16px;">
+              <h3 style="color:#0B2B6F;font-size:15px;margin:0 0 12px;font-weight:700;">Thông tin chi tiết đặt hàng:</h3>
+              <table cellpadding="0" cellspacing="0" style="width:100%;">
+                <tr>
+                  <td style="padding:6px 0;color:#4a5568;font-size:14px;width:160px;">Gói đăng ký:</td>
+                  <td style="padding:6px 0;color:#1a1a1a;font-size:14px;font-weight:600;">{{TEN_GOI}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#4a5568;font-size:14px;">Thời gian sử dụng:</td>
+                  <td style="padding:6px 0;color:#1a1a1a;font-size:14px;font-weight:600;">{{NGAY_DAT_HANG}} – {{NGAY_HET_HAN}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#4a5568;font-size:14px;">Trạng thái thanh toán:</td>
+                  <td style="padding:6px 0;font-size:14px;font-weight:600;">
+                    <span style="display:inline-block;padding:2px 10px;border-radius:12px;background-color:{{THANH_TOAN_BG}};color:{{THANH_TOAN_COLOR}};font-size:13px;">{{THANH_TOAN}}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Access Info -->
+          <tr>
+            <td style="padding:8px 40px 16px;">
+              <h3 style="color:#0B2B6F;font-size:15px;margin:0 0 12px;font-weight:700;">Thông tin truy cập:</h3>
+              <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#f7fafc;border-radius:10px;border:1px solid #e2e8f0;">
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;color:#4a5568;font-size:14px;width:140px;">URL quản lý:</td>
+                  <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;color:#034CC9;font-size:14px;font-weight:600;">
+                    <a href="{{HOST_URL}}" style="color:#034CC9;text-decoration:none;">{{HOST_URL}}</a>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;color:#4a5568;font-size:14px;">Tài khoản:</td>
+                  <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;color:#1a1a1a;font-size:14px;font-weight:600;font-family:monospace;">{{HOST_USERNAME}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;color:#4a5568;font-size:14px;">Mật khẩu:</td>
+                  <td style="padding:12px 16px;border-bottom:1px solid #e2e8f0;color:#1a1a1a;font-size:14px;font-weight:600;font-family:monospace;">{{HOST_PASSWORD}}</td>
+                </tr>
+                <tr>
+                  <td style="padding:12px 16px;color:#4a5568;font-size:14px;">Tên miền:</td>
+                  <td style="padding:12px 16px;color:#1a1a1a;font-size:14px;font-weight:600;">{{HOST_DOMAIN}}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Thank you -->
+          <tr>
+            <td style="padding:16px 40px 24px;">
+              <p style="color:#4a5568;font-size:15px;margin:0;line-height:1.7;">
+                Cảm ơn Quý khách hàng đã tin tưởng và sử dụng dịch vụ của chúng tôi.<br>
+                Nếu cần hỗ trợ thêm, vui lòng liên hệ theo thông tin bên dưới.
+              </p>
+              <p style="color:#1a1a1a;font-size:15px;margin:16px 0 0;line-height:1.7;">Trân trọng,</p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f7fafc;padding:24px 40px;border-top:1px solid #e2e8f0;">
+              <table cellpadding="0" cellspacing="0" style="width:100%;">
+                <tr>
+                  <td style="padding-bottom:12px;">
+                    <img src="https://vmst.host/image/logo-vmst-ne.svg" alt="VMST Host" width="100" height="22" style="display:inline-block;" />
+                  </td>
+                </tr>
+              </table>
+              <p style="color:#1a202c;font-size:14px;margin:0 0 8px;font-weight:700;">CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ VMST VIỆT NAM</p>
+              <p style="color:#718096;font-size:13px;margin:0;line-height:1.8;">
+                Địa chỉ: 465 Hiệp Thành 13, P. Hiệp Thành, Q.12, TP.HCM<br>
+                Hotline: <strong style="color:#1a202c;">0822 636 676</strong><br>
+                Website: <a href="https://vmst.host" style="color:#034CC9;text-decoration:none;">vmst.host</a> |
+                <a href="https://vmst.media" style="color:#034CC9;text-decoration:none;">vmst.media</a> |
+                <a href="https://vmst.com.vn" style="color:#034CC9;text-decoration:none;">vmst.com.vn</a>
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:16px 40px;text-align:center;">
+              <p style="color:#a0aec0;font-size:11px;margin:0;">&copy; 2026 CÔNG TY TNHH GIẢI PHÁP CÔNG NGHỆ VMST VIỆT NAM</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

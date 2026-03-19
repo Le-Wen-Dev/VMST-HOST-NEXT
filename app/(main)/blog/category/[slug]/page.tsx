@@ -1,0 +1,96 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { getCategoryBySlug } from '@/services/categoryBlogs';
+import { listBlogs, BlogRecord } from '@/services/blogs';
+
+export default function BlogCategoryPage() {
+  const params = useParams();
+  const categorySlug = params.slug as string;
+  const [category, setCategory] = useState<any | null>(null);
+  const [posts, setPosts] = useState<BlogRecord[]>([]);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const cat = await getCategoryBySlug(categorySlug);
+        setCategory(cat);
+        if (cat?.id) {
+          const res = await listBlogs({ page: 1, perPage: 18, categoryId: cat.id, sort: '-created' });
+          setPosts(res.items);
+        }
+      } catch (e) {
+        console.error('Failed to load category/blogs:', e);
+      }
+    }
+    load();
+  }, [categorySlug]);
+
+  if (!category) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Danh mục không tồn tại</h1>
+          <Link href="/blog" className="text-[#034CC9] font-semibold hover:underline">
+            Quay lại Blog
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-gradient-to-br from-[#034CC9] to-[#0B2B6F] text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Link
+            href="/blog"
+            className="flex items-center text-white hover:text-blue-100 mb-6 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Quay lại Blog
+          </Link>
+          <h1 className="text-4xl sm:text-5xl font-bold mb-4">{category.name}</h1>
+          <p className="text-xl text-blue-100">{category.description}</p>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {posts.map((post) => (
+            <Link
+              key={post.id}
+              href={`/blog/${post.slug}`}
+              className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all cursor-pointer group block"
+            >
+              <div className="relative h-48 overflow-hidden">
+                <img
+                  src={post.avatar || 'https://placehold.co/600x400'}
+                  alt={post.tieu_de}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                />
+              </div>
+              <div className="p-6">
+                <div className="flex items-center text-sm text-gray-500 mb-3">
+                  <span>{new Date(post.created || '').toLocaleDateString()}</span>
+                  <span className="mx-2">•</span>
+                  <span>{post.so_phut_doc || '—'}</span>
+                </div>
+                <h3 className="text-xl font-semibold text-[#0B2B6F] mb-3 group-hover:text-[#034CC9] transition-colors">
+                  {post.tieu_de}
+                </h3>
+                <p className="text-gray-600 text-sm mb-4 line-clamp-2">{post.mo_ta_ngan}</p>
+                <div className="flex items-center text-[#034CC9] font-semibold text-sm group-hover:underline">
+                  Đọc thêm
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

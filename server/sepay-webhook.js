@@ -2,337 +2,252 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import PocketBase from 'pocketbase';
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import nodemailer from 'nodemailer';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { processOrder, registerDARoutes } from './da-middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load env from .env (server-side). You can set WEBHOOK_ENV_PATH to choose another file.
-dotenv.config({ path: process.env.WEBHOOK_ENV_PATH || '.env' });
+dotenv.config({ path: process.env.WEBHOOK_ENV_PATH || path.join(__dirname, '..', '.env.local') });
 
 const app = express();
+
+// SePay gửi raw JSON, cần giữ raw body để verify HMAC
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-// Student Voucher API
-const JSON_FILE_PATH = path.join(__dirname, 'student-vouchers.json');
+// === Config ===
+const PORT = process.env.SEPAY_SERVER_PORT || 4000;
+const PB_URL = process.env.PB_URL || process.env.NEXT_PUBLIC_PB_URL || 'https://api.vmst.host';
+const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL || 'admin@vmst.host';
+const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD || 'admin@!@#';
+const SEPAY_SECRET_KEY = process.env.SEPAY_SECRET_KEY || '';
 
-async function readStudentList() {
-  try {
-    const data = await fs.readFile(JSON_FILE_PATH, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    const defaultData = {
-      voucher_code: 'VOVANMY2026',
-      product_id: '',
-      students: []
-    };
-    await fs.writeFile(JSON_FILE_PATH, JSON.stringify(defaultData, null, 2), 'utf8');
-    return defaultData;
-  }
-}
-
-async function writeStudentList(data) {
-  await fs.writeFile(JSON_FILE_PATH, JSON.stringify(data, null, 2), 'utf8');
-}
-
-// GET: Kiểm tra email có trong danh sách và đã sử dụng chưa
-app.get('/api/student-vouchers/check/:email', async (req, res) => {
-  try {
-    const email = decodeURIComponent(req.params.email).toLowerCase().trim();
-    const data = await readStudentList();
-    
-    const student = data.students.find(s => s.email.toLowerCase() === email);
-    
-    if (!student) {
-      return res.json({ 
-        allowed: false, 
-        used: false, 
-        message: 'Email không nằm trong danh sách sinh viên được phép' 
-      });
-    }
-    
-    res.json({
-      allowed: true,
-      used: student.used || false,
-      usedAt: student.usedAt || null,
-      orderId: student.orderId || null,
-      message: student.used ? 'Email này đã sử dụng voucher' : 'Email hợp lệ và chưa sử dụng'
-    });
-  } catch (error) {
-    console.error('Error checking student email:', error);
-    res.status(500).json({ error: 'Không thể kiểm tra email' });
-  }
-});
-
-// POST: Đánh dấu email đã sử dụng voucher
-app.post('/api/student-vouchers/mark-used', async (req, res) => {
-  try {
-    const { email, orderId } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ error: 'Email là bắt buộc' });
-    }
-    
-    const normalizedEmail = email.toLowerCase().trim();
-    const data = await readStudentList();
-    
-    const studentIndex = data.students.findIndex(s => s.email.toLowerCase() === normalizedEmail);
-    
-    if (studentIndex === -1) {
-      return res.status(404).json({ error: 'Email không nằm trong danh sách sinh viên' });
-    }
-    
-    const student = data.students[studentIndex];
-    
-    if (student.used) {
-      return res.status(400).json({ error: 'Email này đã sử dụng voucher rồi' });
-    }
-    
-    // Đánh dấu đã sử dụng
-    data.students[studentIndex] = {
-      ...student,
-      used: true,
-      usedAt: new Date().toISOString(),
-      orderId: orderId || null
-    };
-    
-    await writeStudentList(data);
-    
-    res.json({ 
-      success: true, 
-      message: 'Đã đánh dấu email đã sử dụng voucher',
-      student: data.students[studentIndex]
-    });
-  } catch (error) {
-    console.error('Error marking student as used:', error);
-    res.status(500).json({ error: 'Không thể đánh dấu email đã sử dụng' });
-  }
-});
-
-// GET: Lấy danh sách đầy đủ (admin only)
-app.get('/api/student-vouchers/list', async (req, res) => {
-  try {
-    const data = await readStudentList();
-    res.json(data);
-  } catch (error) {
-    console.error('Error reading student list:', error);
-    res.status(500).json({ error: 'Không thể đọc danh sách sinh viên' });
-  }
-});
-
-// POST: Thêm email vào danh sách (admin only)
-app.post('/api/student-vouchers/add', async (req, res) => {
-  try {
-    const { emails } = req.body;
-    
-    if (!Array.isArray(emails) || emails.length === 0) {
-      return res.status(400).json({ error: 'Danh sách email không hợp lệ' });
-    }
-    
-    const data = await readStudentList();
-    
-    const newEmails = emails
-      .map(e => e.toLowerCase().trim())
-      .filter(e => e && e.includes('@'))
-      .filter(e => !data.students.some(s => s.email.toLowerCase() === e));
-    
-    newEmails.forEach(email => {
-      data.students.push({
-        email,
-        used: false,
-        usedAt: null,
-        orderId: null
-      });
-    });
-    
-    await writeStudentList(data);
-    
-    res.json({ 
-      success: true, 
-      added: newEmails.length,
-      message: `Đã thêm ${newEmails.length} email vào danh sách`
-    });
-  } catch (error) {
-    console.error('Error adding students:', error);
-    res.status(500).json({ error: 'Không thể thêm email vào danh sách' });
-  }
-});
-
-// GET: Lấy thống kê
-app.get('/api/student-vouchers/stats', async (req, res) => {
-  try {
-    const data = await readStudentList();
-    const total = data.students.length;
-    const used = data.students.filter(s => s.used).length;
-    const available = total - used;
-    
-    res.json({
-      total,
-      used,
-      available,
-      voucher_code: data.voucher_code,
-      product_id: data.product_id
-    });
-  } catch (error) {
-    console.error('Error getting stats:', error);
-    res.status(500).json({ error: 'Không thể lấy thống kê' });
-  }
-});
-
-// Import student voucher API
-const studentVoucherRouter = require('./student-voucher-api');
-app.use('/', studentVoucherRouter);
-
-const PORT = process.env.PORT || 4000;
-const PB_URL = process.env.PB_URL || process.env.VITE_PB_URL || 'http://127.0.0.1:8090';
-const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL || process.env.VITE_CONTACT_ADMIN_EMAIL || 'admin@vmst.host';
-const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD || process.env.VITE_CONTACT_ADMIN_PASSWORD || 'admin@!@#';
-const SEPAY_SECRET_KEY = process.env.SEPAY_SECRET_KEY || process.env.VITE_SEPAY_SECRET_KEY || '';
-const ADMIN_NOTIFY_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || 'lequelcm@gmail.com';
-const SMTP_HOST = process.env.SMTP_HOST || '';
-const SMTP_PORT = Number(process.env.SMTP_PORT || 0);
+// === SMTP Config ===
+const SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER || 'noreply@vmst.host';
 
-function generateSignature(data) {
-  // Build canonical string: key=value&key=value sorted by keys
-  const sortedKeys = Object.keys(data).filter(k => data[k] !== undefined && data[k] !== null).sort();
-  const signatureString = sortedKeys.map(key => `${key}=${data[key]}`).join('&');
-  if (!SEPAY_SECRET_KEY) return '';
-  return createHmac('sha256', SEPAY_SECRET_KEY).update(signatureString).digest('hex');
+let mailTransporter = null;
+if (SMTP_USER && SMTP_PASS) {
+  mailTransporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+  console.log(`[mail] SMTP configured: ${SMTP_HOST}:${SMTP_PORT} (${SMTP_USER})`);
+} else {
+  console.log('[mail] SMTP not configured — confirmation emails disabled');
 }
 
-async function ensureAdmin(pb) {
-  if (pb.authStore.isValid) return;
-  await pb.admins.authWithPassword(PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD);
-}
-
-app.get('/health', (req, res) => {
-  res.json({ ok: true, service: 'sepay-webhook', time: new Date().toISOString() });
-});
-
-// Simple email notifier for new orders
-app.post('/api/notify-new-order', async (req, res) => {
+// Load email template
+let paymentConfirmedHtml = '';
+(async () => {
   try {
-    const { to, subject, text } = req.body || {};
-    const target = to || ADMIN_NOTIFY_EMAIL;
-    if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
-      console.log('[notify-new-order] SMTP not configured. Printing email to console instead.');
-      console.log('To:', target);
-      console.log('Subject:', subject);
-      console.log('Text:\n', text);
-      return res.json({ ok: true, simulated: true });
-    }
-    const transporter = nodemailer.createTransport({
-      host: SMTP_HOST,
-      port: SMTP_PORT,
-      secure: SMTP_PORT === 465, // true for 465, false for other ports
-      auth: { user: SMTP_USER, pass: SMTP_PASS },
-    });
-    await transporter.verify();
-    await transporter.sendMail({ from: SMTP_USER, to: target, subject, text });
-    return res.json({ ok: true });
-  } catch (err) {
-    console.error('[notify-new-order] failed:', err);
-    return res.status(500).json({ ok: false, error: 'email_failed' });
+    paymentConfirmedHtml = await fs.readFile(path.join(__dirname, '..', 'public', 'email-template-payment-confirmed.html'), 'utf-8');
+    console.log('[mail] Payment confirmed template loaded');
+  } catch {
+    console.warn('[mail] Could not load email-template-payment-confirmed.html');
   }
+})();
+
+async function sendPaymentConfirmationEmail(customerEmail) {
+  if (!mailTransporter || !customerEmail || !paymentConfirmedHtml) {
+    console.log('[mail] Skip email:', !mailTransporter ? 'no SMTP' : !customerEmail ? 'no email' : 'no template');
+    return;
+  }
+  try {
+    await mailTransporter.sendMail({
+      from: `"VMST Host" <${SMTP_FROM}>`,
+      to: customerEmail,
+      subject: 'Xác nhận thanh toán thành công - VMST Host',
+      html: paymentConfirmedHtml,
+    });
+    console.log(`[mail] Confirmation sent to ${customerEmail}`);
+  } catch (err) {
+    console.error(`[mail] Failed to send to ${customerEmail}:`, err.message);
+  }
+}
+
+// === PocketBase Admin Auth ===
+async function getAdminPb() {
+  const pb = new PocketBase(PB_URL);
+  pb.autoCancellation(false);
+  try {
+    await pb.collection('_superusers').authWithPassword(PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD);
+    console.log('[pb] Superuser auth OK');
+  } catch {
+    try {
+      await pb.admins.authWithPassword(PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD);
+      console.log('[pb] Legacy admin auth OK');
+    } catch (err) {
+      console.error('[pb] All admin auth failed:', err.message);
+    }
+  }
+  return pb;
+}
+
+// === HMAC Verification ===
+function verifySePaySignature(rawBody, receivedChecksum) {
+  if (!SEPAY_SECRET_KEY) return true; // skip in dev
+  try {
+    const expected = createHmac('sha256', SEPAY_SECRET_KEY).update(rawBody).digest('hex');
+    return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(receivedChecksum, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+// === Extract order code từ nội dung CK (regex) ===
+function extractOrderCode(content) {
+  const trimmed = content.trim().toUpperCase();
+  if (/^[A-Z0-9]{4,20}$/.test(trimmed)) return trimmed;
+
+  const parts = trimmed.split(/[\s.]+/);
+  for (const part of parts) {
+    if (/^[A-Z0-9]{6}$/.test(part) && /[A-Z]/.test(part) && /[0-9]/.test(part)) {
+      if (/^MBVCB|^CT$|^GD$|^ACB$/.test(part)) continue;
+      return part;
+    }
+  }
+
+  const match = trimmed.match(/\b([A-Z][A-Z0-9]{3,7})\b/);
+  if (match && !/^MBVCB|^CT$|^GD$/.test(match[1])) return match[1];
+
+  return trimmed;
+}
+
+// === Health check ===
+app.get('/health', (req, res) => {
+  res.json({ ok: true, service: 'sepay-webhook-server', time: new Date().toISOString() });
 });
 
-app.post('/api/payments/webhook', async (req, res) => {
+// === SePay Webhook — endpoint chính ===
+app.post('/api/sepay', async (req, res) => {
   try {
-    const payload = req.body || {};
-    const { signature, ...data } = payload;
+    const rawBody = JSON.stringify(req.body);
+    const checksum = req.headers['checksum'] || '';
 
-    // Verify signature (if secret is provided)
-    if (SEPAY_SECRET_KEY) {
-      const expected = generateSignature(data);
-      if (!signature || signature !== expected) {
-        return res.status(400).json({ ok: false, error: 'invalid_signature' });
+    if (checksum && !verifySePaySignature(rawBody, checksum)) {
+      console.warn('[SePay] Invalid signature');
+      return res.status(401).json({ ok: false, error: 'invalid_signature' });
+    }
+
+    const payload = req.body;
+    console.log('[SePay] Received:', JSON.stringify(payload));
+
+    const amount = Number(payload.transferAmount || payload.amount || 0);
+    const content = String(payload.content || payload.description || '').trim();
+    const transactionId = String(payload.id || payload.transaction_id || payload.referenceCode || '');
+
+    if (!content) return res.status(400).json({ ok: false, error: 'empty_content' });
+    if (!amount || amount <= 0) {
+      console.log('[SePay] Invalid amount:', amount);
+      return res.status(400).json({ ok: false, error: 'invalid_amount' });
+    }
+
+    const pb = await getAdminPb();
+    const contentUpper = content.toUpperCase();
+    let orderRecord = null;
+    let matchedCode = '';
+
+    // Cách 1: Regex extraction
+    const extracted = extractOrderCode(content);
+    console.log(`[SePay] Extracted: "${extracted}"`);
+
+    if (extracted) {
+      try {
+        orderRecord = await pb.collection('orders').getFirstListItem(`ma_don_hang = "${extracted}"`);
+        matchedCode = extracted;
+      } catch {
+        try {
+          orderRecord = await pb.collection('orders').getOne(extracted);
+          matchedCode = extracted;
+        } catch { orderRecord = null; }
       }
     }
 
-    const status = String(data.status || '').toUpperCase();
-    const orderId = String(data.orderId || '').trim();
-    const amount = data.amount;
-
-    if (!orderId) {
-      return res.status(400).json({ ok: false, error: 'missing_orderId' });
-    }
-
-    // Update order in PocketBase
-    const pb = new PocketBase(PB_URL);
-    pb.autoCancellation(false);
-    await ensureAdmin(pb);
-
-    let orderRecord = null;
-    try {
-      orderRecord = await pb.collection('orders').getFirstListItem(`ma_don_hang = "${orderId}"`);
-    } catch (e) {
+    // Cách 2: Fallback — substring match với tất cả đơn chờ thanh toán
+    if (!orderRecord) {
+      console.log('[SePay] Regex failed, trying substring match...');
       try {
-        orderRecord = await pb.collection('orders').getOne(orderId);
-      } catch (_) {
-        orderRecord = null;
+        const pending = await pb.collection('orders').getList(1, 200, {
+          filter: 'thanh_toan = "cho_thanh_toan"',
+        });
+        for (const order of pending.items) {
+          const code = (order.ma_don_hang || '').toUpperCase();
+          if (code && contentUpper.includes(code)) {
+            orderRecord = order;
+            matchedCode = code;
+            console.log(`[SePay] Substring match: "${code}"`);
+            break;
+          }
+        }
+      } catch (err) {
+        console.error('[SePay] Error querying pending orders:', err.message);
       }
     }
 
     if (!orderRecord) {
-      return res.status(404).json({ ok: false, error: 'order_not_found', orderId });
+      console.log(`[SePay] Order not found for: "${content}"`);
+      return res.status(404).json({ ok: false, error: 'order_not_found', content });
     }
 
-    // Only confirm when SUCCESS
-    if (status === 'SUCCESS') {
+    console.log(`[SePay] Found order: ${orderRecord.id}, ma_don_hang: ${orderRecord.ma_don_hang}, gia_tri: ${orderRecord.gia_tri}`);
+
+    // Check số tiền
+    const orderAmount = parseFloat(String(orderRecord.gia_tri || '0').replace(/[^\d.]/g, ''));
+
+    if (orderAmount > 0 && amount < orderAmount) {
+      console.log(`[SePay] Amount mismatch: got ${amount}, expected ${orderAmount}`);
       await pb.collection('orders').update(orderRecord.id, {
-        thanh_toan: 'da_thanh_toan',
-        trang_thai_su_dung: 'dang_su_dung',
-        ghi_chu_noi_bo: `Auto-updated via SePay webhook at ${new Date().toISOString()} | amount=${amount}`
+        sepay: JSON.stringify({ amount, content, transaction_id: transactionId, warning: 'amount_mismatch', confirmed_at: new Date().toISOString() }),
+        ghi_chu_noi_bo: `${orderRecord.ghi_chu_noi_bo || ''}\n[SePay] Nhận ${amount}đ (thiếu, cần ${orderAmount}đ) | TX: ${transactionId} | ${new Date().toISOString()}`.trim()
       });
-
-      // Kiểm tra nếu đơn hàng có sử dụng voucher sinh viên VOVANMY2026
-      const ghiChu = orderRecord.ghi_chu_noi_bo || '';
-      if (ghiChu.includes('VOVANMY2026')) {
-        // Lấy email từ ghi chú
-        const emailMatch = ghiChu.match(/Email:\s*([^\s|]+)/i);
-        const customerEmail = emailMatch ? emailMatch[1].trim() : null;
-        
-        if (customerEmail) {
-          try {
-            // Đánh dấu email đã sử dụng voucher
-            const data = await readStudentList();
-            const normalizedEmail = customerEmail.toLowerCase().trim();
-            const studentIndex = data.students.findIndex(s => s.email.toLowerCase() === normalizedEmail);
-            
-            if (studentIndex !== -1 && !data.students[studentIndex].used) {
-              data.students[studentIndex] = {
-                ...data.students[studentIndex],
-                used: true,
-                usedAt: new Date().toISOString(),
-                orderId: orderId
-              };
-              await writeStudentList(data);
-              console.log(`[student-voucher] Marked email ${customerEmail} as used for order ${orderId}`);
-            }
-          } catch (err) {
-            console.error('[student-voucher] Error marking email as used:', err);
-            // Không block webhook nếu lỗi
-          }
-        }
-      }
+      return res.json({ ok: true, orderCode: matchedCode, warning: 'amount_mismatch', received: amount, expected: orderAmount });
     }
 
-    return res.json({ ok: true, orderId, status, updated: status === 'SUCCESS' });
+    // Update đơn → đã thanh toán (KHÔNG set trang_thai_su_dung — để DA middleware xử lý)
+    await pb.collection('orders').update(orderRecord.id, {
+      thanh_toan: 'da_thanh_toan',
+      sepay: JSON.stringify({ amount, content, transaction_id: transactionId, confirmed_at: new Date().toISOString() }),
+      ghi_chu_noi_bo: `${orderRecord.ghi_chu_noi_bo || ''}\n[SePay] Xác nhận ${amount}đ | TX: ${transactionId} | ${new Date().toISOString()}`.trim()
+    });
+
+    console.log(`[SePay] Order ${matchedCode} → da_thanh_toan`);
+
+    // Auto-provision DirectAdmin hosting (background, không block response)
+    processOrder(orderRecord.id, pb).catch(err => {
+      console.error(`[DA] Auto-provision failed for ${matchedCode}:`, err.message);
+    });
+
+    // Gửi email xác nhận thanh toán cho khách
+    const ghiChu = orderRecord.ghi_chu_noi_bo || '';
+    const emailMatch = ghiChu.match(/Email:\s*([^\s|]+)/i);
+    const customerEmail = emailMatch ? emailMatch[1].trim() : '';
+    sendPaymentConfirmationEmail(customerEmail).catch(() => {});
+
+    return res.json({ ok: true, orderCode: matchedCode, amount, transactionId, updated: true });
   } catch (err) {
-    console.error('Webhook error:', err);
+    console.error('[SePay] Error:', err);
     return res.status(500).json({ ok: false, error: 'server_error' });
   }
 });
 
+// === Register DirectAdmin middleware routes ===
+registerDARoutes(app, getAdminPb);
+
+// === Start ===
 app.listen(PORT, () => {
-  console.log(`[sepay-webhook] listening on http://localhost:${PORT}`);
-  console.log('Health check: GET /health');
-  console.log('Webhook endpoint: POST /api/payments/webhook');
+  console.log(`[sepay-server] Running on http://localhost:${PORT}`);
+  console.log(`[sepay-server] PB_URL: ${PB_URL}`);
+  console.log(`[sepay-server] Webhook: POST /api/sepay`);
+  console.log(`[sepay-server] Health:  GET /health`);
 });

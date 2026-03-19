@@ -1,0 +1,80 @@
+STK: 24086051
+Tên tai khoản: MAI LE QUEL
+Ngân Hàng: ACB
+Số điện thoại: 0832575905
+
+
+Thông tin tích hợp
+MERCHANT ID
+SP-TEST-ML584A25
+SECRET KEY
+Không được tiết lộ các thông tin tích hợp này ra bên ngoài
+spsk_test_un43QpQGkieSQj4gpDrr7CFNwAfxV5bp
+
+
+Flow chuẩn cần có
+1. Khách chuyển khoản
+
+Nội dung CK: DH12345 (mã đơn)
+
+2. SePay gửi webhook về server ông
+
+Ví dụ payload:
+
+{
+  "amount": 200000,
+  "content": "DH12345",
+  "transaction_id": "abc123"
+}
+3. Server ông xử lý
+
+👉 Logic cần làm:
+
+✅ Bước 1: Parse nội dung chuyển khoản
+
+Lấy DH12345
+
+✅ Bước 2: Tìm đơn hàng trong DB
+
+match order_code = DH12345
+
+✅ Bước 3: Check số tiền
+
+so sánh:
+
+tiền nhận = tiền đơn
+
+✅ Bước 4: Update trạng thái
+
+pending → paid
+
+🔧 Cách làm thực tế (quan trọng)
+✅ Cách 1: Dùng Webhook (chuẩn nhất)
+
+Trong SePay:
+
+vào phần Webhook URL
+
+nhập API của ông:
+
+https://domain.com/api/sepay
+Code mẫu (NodeJS)
+app.post('/api/sepay', (req, res) => {
+    const { amount, content } = req.body;
+
+    // extract mã đơn
+    const orderCode = content.trim();
+
+    // tìm đơn
+    const order = findOrder(orderCode);
+
+    if (!order) return res.send('not found');
+
+    // check tiền
+    if (order.amount == amount) {
+        order.status = 'paid';
+        saveOrder(order);
+    }
+
+    res.send('ok');
+});

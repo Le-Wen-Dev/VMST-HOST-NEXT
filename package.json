@@ -4,13 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "webhook": "node server/sepay-webhook.js",
-    "build": "vite build",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "seo:generate": "node scripts/generate-sitemap.mjs",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-classic": "^41.4.2",
@@ -22,16 +21,18 @@
     "express": "^5.1.0",
     "html-react-parser": "^5.2.8",
     "lucide-react": "^0.344.0",
+    "next": "^16.1.7",
     "nodemailer": "^7.0.10",
     "pocketbase": "^0.26.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-helmet-async": "^2.0.5"
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-helmet-async": "^2.0.5",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
-    "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
     "eslint": "^9.9.1",
