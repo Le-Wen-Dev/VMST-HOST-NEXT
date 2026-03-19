@@ -22,6 +22,7 @@ interface AuthContextType {
   token: string | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
+  authReady: boolean;
   login: (email: string, password: string) => Promise<UserRecord>;
   logout: () => void;
   register: (input: RegisterInput) => Promise<UserRecord>;
@@ -99,6 +100,7 @@ function clearAuthCookie() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserRecord | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   // Initialize auth state from PocketBase + localStorage (7 days)
   useEffect(() => {
@@ -126,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setUser(currentUser);
     setToken(currentToken);
+    setAuthReady(true);
 
     // Listen for auth changes and persist for 7 days
     const unsubscribe = pb.authStore.onChange((changedToken, model) => {
@@ -355,6 +358,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     token,
     isLoggedIn,
     isAdmin: isAdminUser,
+    authReady,
     login,
     logout,
     register,

@@ -18,7 +18,16 @@ interface PortalService {
 
 export default function PortalPage() {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, isLoggedIn, authReady } = useAuth();
+
+  // Client-side auth guard
+  useEffect(() => {
+    if (authReady && !isLoggedIn) {
+      router.replace('/login?redirect=/portal');
+    }
+  }, [authReady, isLoggedIn, router]);
+
+  if (!authReady || !isLoggedIn) return null;
   const [services, setServices] = useState<PortalService[]>([]);
   const [loading, setLoading] = useState(true);
 

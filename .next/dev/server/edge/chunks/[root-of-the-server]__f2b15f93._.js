@@ -23,51 +23,10 @@ __turbopack_context__.s([
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$api$2f$server$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/node_modules/next/dist/esm/api/server.js [middleware-edge] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/esm/server/web/exports/index.js [middleware-edge] (ecmascript)");
 ;
-const PROTECTED_ROUTES = [
-    '/portal',
-    '/profile',
-    '/my-services',
-    '/my-orders',
-    '/my-tickets',
-    '/affiliate'
-];
-const ADMIN_ROUTES = [
-    '/admin'
-];
-function isProtectedRoute(pathname) {
-    return PROTECTED_ROUTES.some((route)=>pathname === route || pathname.startsWith(route + '/'));
-}
-function isAdminRoute(pathname) {
-    return ADMIN_ROUTES.some((route)=>pathname === route || pathname.startsWith(route + '/'));
-}
-function middleware(req) {
-    const { pathname } = req.nextUrl;
-    // Skip API routes and static files
-    if (pathname.startsWith('/api/') || pathname.startsWith('/_next/') || pathname.includes('.')) {
-        return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].next();
-    }
-    // Use lightweight pb_token cookie, fallback to pb_auth
-    const token = req.cookies.get('pb_token')?.value || req.cookies.get('pb_auth')?.value;
-    // Protected routes: require authentication
-    if (isProtectedRoute(pathname)) {
-        if (!token) {
-            const loginUrl = new URL('/login', req.url);
-            loginUrl.searchParams.set('redirect', pathname);
-            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(loginUrl);
-        }
-    }
-    // Admin routes: require admin role
-    if (isAdminRoute(pathname)) {
-        if (!token) {
-            const loginUrl = new URL('/login', req.url);
-            loginUrl.searchParams.set('redirect', pathname);
-            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(loginUrl);
-        }
-        const role = req.cookies.get('pb_role')?.value;
-        if (role !== 'admin') {
-            return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].redirect(new URL('/', req.url));
-        }
-    }
+function middleware(_req) {
+    // Auth check is handled client-side by AuthContext.
+    // PocketBase stores auth in localStorage + cookie, but cookie can exceed 4KB
+    // causing server-side middleware to fail. Let all routes through.
     return __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$esm$2f$server$2f$web$2f$exports$2f$index$2e$js__$5b$middleware$2d$edge$5d$__$28$ecmascript$29$__["NextResponse"].next();
 }
 const config = {
