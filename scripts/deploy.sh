@@ -48,6 +48,7 @@ echo -e "${GREEN}✓ Build complete${NC}"
 echo ""
 echo -e "${CYAN}[3/4] Packaging...${NC}"
 tar czf /tmp/vmst-deploy.tar.gz \
+  --no-xattrs \
   --exclude='node_modules' \
   --exclude='.git' \
   --exclude='.claude' \
@@ -74,7 +75,7 @@ sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} <
   set -e
   cd /var/www/v2.vmst.host
   tar xzf /tmp/vmst-deploy.tar.gz
-  npm install --production
+  npm install --omit=dev --legacy-peer-deps
   pm2 restart v2-vmst-host || pm2 start npm --name v2-vmst-host -- start
   pm2 restart sepay-server || pm2 start server/sepay-webhook.js --name sepay-server
   rm /tmp/vmst-deploy.tar.gz

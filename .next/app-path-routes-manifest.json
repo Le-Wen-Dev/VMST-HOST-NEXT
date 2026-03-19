@@ -34,6 +34,7 @@
   "/api/admin/notifications/mark-all-read/route": "/api/admin/notifications/mark-all-read",
   "/api/admin/notifications/route": "/api/admin/notifications",
   "/api/admin/notifications/unread-count/route": "/api/admin/notifications/unread-count",
+  "/api/admin/orders/[id]/provision/route": "/api/admin/orders/[id]/provision",
   "/api/admin/orders/[id]/route": "/api/admin/orders/[id]",
   "/api/admin/orders/route": "/api/admin/orders",
   "/api/admin/products/route": "/api/admin/products",
