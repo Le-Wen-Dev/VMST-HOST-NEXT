@@ -429,11 +429,38 @@ export default function OrderManagement() {
         host_password: hostPassword || undefined,
         ghi_chu_noi_bo: ghiChuNoiBo || undefined,
       };
+      let savedOrderId = selectedOrder?.id;
       if (selectedOrder) {
         await updateOrder(selectedOrder.id, payload);
       } else {
-        await createOrder(payload);
+        const created = await createOrder(payload);
+        savedOrderId = created.id;
       }
+
+      // Auto-trigger DA provisioning nếu đủ điều kiện:
+      // đã thanh toán + có host info + chưa kích hoạt (không phải dang_su_dung)
+      const canProvision =
+        thanhToan === 'da_thanh_toan' &&
+        trangThaiSuDung !== 'dang_su_dung' &&
+        hostUrl && hostUsername && hostPassword &&
+        savedOrderId;
+
+      if (canProvision) {
+        try {
+          const daRes = await fetch(`/api/admin/orders/${savedOrderId}/provision`, {
+            method: 'POST',
+          });
+          const daData = await daRes.json().catch(() => ({}));
+          if (daRes.ok) {
+            console.log('[DA] Auto-provision triggered:', daData);
+          } else {
+            console.warn('[DA] Auto-provision response:', daRes.status, daData);
+          }
+        } catch (daErr) {
+          console.warn('[DA] Auto-provision failed (sidecar có thể chưa chạy):', daErr);
+        }
+      }
+
       setShowFormModal(false);
       const res = await listOrders({ page, perPage, thanh_toan: paymentStatusFilter, trang_thai_su_dung: orderStatusFilter, search: searchTerm });
       setOrders((res.items || []).map((r: any) => ({
