@@ -76,7 +76,7 @@ sshpass -p "$VPS_PASS" ssh -o StrictHostKeyChecking=no ${VPS_USER}@${VPS_HOST} <
   cd /var/www/v2.vmst.host
   tar xzf /tmp/vmst-deploy.tar.gz
   npm install --omit=dev --legacy-peer-deps
-  pm2 restart v2-vmst-host || pm2 start npm --name v2-vmst-host -- start
+  pm2 restart v2-vmst-host || PORT=3005 pm2 start npm --name v2-vmst-host -- start -- -p 3005
   pm2 restart sepay-server || pm2 start server/sepay-webhook.js --name sepay-server
   rm /tmp/vmst-deploy.tar.gz
   echo "Deploy OK"
