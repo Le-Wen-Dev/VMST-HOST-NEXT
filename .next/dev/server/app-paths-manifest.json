@@ -1,9 +1,3 @@
 {
-  "/(main)/advisor/page": "app/(main)/advisor/page.js",
-  "/(main)/blog/[slug]/page": "app/(main)/blog/[slug]/page.js",
-  "/(main)/blog/page": "app/(main)/blog/page.js",
-  "/(main)/cart/page": "app/(main)/cart/page.js",
-  "/(main)/contact/page": "app/(main)/contact/page.js",
-  "/(main)/page": "app/(main)/page.js",
-  "/(main)/pricing/page": "app/(main)/pricing/page.js"
+  "/(main)/page": "app/(main)/page.js"
 }
