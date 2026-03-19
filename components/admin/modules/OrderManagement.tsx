@@ -139,6 +139,8 @@ export default function OrderManagement() {
   const [ngayDatHang, setNgayDatHang] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSentCount, setEmailSentCount] = useState(0);
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [duplicateDismissed, setDuplicateDismissed] = useState(false);
 
   useEffect(() => {
     const refresh = async () => {
@@ -344,6 +346,22 @@ export default function OrderManagement() {
     // Parse email sent count
     const sentMatch = (order.ghi_chu_noi_bo || '').match(/Email sent:\s*(\d+)/i);
     setEmailSentCount(sentMatch ? parseInt(sentMatch[1], 10) : 0);
+
+    // Check duplicate username across all orders
+    setDuplicateWarning(null);
+    setDuplicateDismissed(false);
+    const usernameToCheck = order.host_username || (parsed?.email ? parsed.email.split('@')[0] : '');
+    if (usernameToCheck) {
+      listOrders({ perPage: 500 }).then(res => {
+        const dupes = res.items.filter((o: any) =>
+          o.id !== order.id && o.host_username && o.host_username === usernameToCheck
+        );
+        if (dupes.length > 0) {
+          const dupInfo = dupes.map((d: any) => `${d.ma_don_hang} (${d.host_url || '-'})`).join(', ');
+          setDuplicateWarning(`Username "${usernameToCheck}" đã tồn tại ở đơn: ${dupInfo}. Cần đổi username hoặc chọn server khác.`);
+        }
+      }).catch(() => {});
+    }
 
     setShowFormModal(true);
   };
@@ -994,6 +1012,20 @@ export default function OrderManagement() {
               Copy tất cả
             </button>
           </div>
+
+          {/* Duplicate warning */}
+          {duplicateWarning && !duplicateDismissed && (
+            <div className="col-span-3 bg-amber-50 border border-amber-300 rounded p-2 flex items-start gap-2">
+              <span className="text-amber-600 text-xs flex-1">{duplicateWarning}</span>
+              <button
+                type="button"
+                onClick={() => setDuplicateDismissed(true)}
+                className="px-2 py-0.5 bg-amber-200 hover:bg-amber-300 rounded text-xs font-medium text-amber-800 whitespace-nowrap"
+              >
+                OK, đã biết
+              </button>
+            </div>
+          )}
 
           {/* Host fields: Tên miền, URL quản lý, Tài khoản */}
           <div>
