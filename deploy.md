@@ -2,6 +2,11 @@ ADMIN UI pocketbase: api.vmst.host
 username: admin@vmst.host
 pass: admin@!@#`
 
+
+Email tool index: index-vmst-host-527@milan-490202.iam.gserviceaccount.com
+
+npm run seo:generate && npm run index
+
 npm run build
 rsync -avz dist/ root@103.37.60.86:/var/www/vmst.host/
 

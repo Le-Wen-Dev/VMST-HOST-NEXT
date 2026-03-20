@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "seo:generate": "node scripts/generate-sitemap.mjs",
+    "index": "node scripts/google-indexing.mjs --sitemap",
     "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "googleapis": "^171.4.0",
     "html-react-parser": "^5.2.8",
     "lucide-react": "^0.344.0",
     "next": "^16.1.7",

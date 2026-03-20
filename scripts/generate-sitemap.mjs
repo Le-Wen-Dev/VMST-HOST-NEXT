@@ -1,13 +1,13 @@
-// Generate sitemap.xml and robots.txt based on PocketBase blogs and static routes
+// Generate sitemap.xml and robots.txt for vmst.host
+// Fetches blog posts from PocketBase + static routes
 import fs from 'node:fs';
 import path from 'node:path';
 import PocketBase from 'pocketbase';
 
 const ROOT = process.cwd();
 const PUBLIC_DIR = path.join(ROOT, 'public');
-
-const SITE_URL = process.env.SITE_URL || process.env.VITE_SITE_URL || 'http://localhost:5173';
-const PB_URL = process.env.PB_URL || process.env.VITE_PB_URL || 'http://127.0.0.1:8090';
+const SITE_URL = 'https://vmst.host';
+const PB_URL = process.env.PB_URL || process.env.NEXT_PUBLIC_PB_URL || 'https://api.vmst.host';
 
 async function fetchAllBlogs() {
   const pb = new PocketBase(PB_URL);
@@ -17,61 +17,64 @@ async function fetchAllBlogs() {
   while (true) {
     const res = await pb.collection('blogs').getList(page, perPage, { sort: '-created' });
     items = items.concat(res.items || []);
-    const totalPages = res.totalPages || Math.ceil((res.totalItems || 0) / perPage);
-    if (page >= totalPages) break;
-    page += 1;
+    if (page >= res.totalPages) break;
+    page++;
   }
   return items;
 }
 
-function ensurePublicDir() {
-  if (!fs.existsSync(PUBLIC_DIR)) {
-    fs.mkdirSync(PUBLIC_DIR);
-  }
+function toW3CDate(dateStr) {
+  if (!dateStr) return new Date().toISOString().split('T')[0];
+  return new Date(dateStr).toISOString().split('T')[0];
 }
 
-function toUrl(pathname) {
-  return `${String(SITE_URL).replace(/\/$/, '')}${pathname}`;
+function escapeXml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function generateSitemap(staticPaths, postSlugs) {
-  const urls = [
-    ...staticPaths.map(p => toUrl(p)),
-    ...postSlugs.map(slug => toUrl(`/blog/${slug}`))
-  ];
-  const now = new Date().toISOString();
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    urls.map(u => `  <url>\n    <loc>${u}</loc>\n    <lastmod>${now}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>`).join('\n') +
-    `\n</urlset>\n`;
-  return xml;
-}
-
-function generateRobots() {
-  return `User-agent: *\nAllow: /\n\nSitemap: ${toUrl('/sitemap.xml')}\n`;
+function buildUrlEntry(loc, lastmod, changefreq, priority) {
+  return `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
 }
 
 async function main() {
-  ensurePublicDir();
-  const staticPaths = [
-    '/', '/pricing', '/advisor', '/contact', '/blog',
-    '/cart', '/login', '/portal', '/profile', '/my-services', '/my-orders', '/my-tickets', '/affiliate', '/support'
+  if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR);
+  const today = new Date().toISOString().split('T')[0];
+
+  const staticPages = [
+    { path: '/', changefreq: 'daily', priority: '1.0' },
+    { path: '/pricing', changefreq: 'weekly', priority: '0.9' },
+    { path: '/wordpress-hosting', changefreq: 'weekly', priority: '0.9' },
+    { path: '/business-hosting', changefreq: 'weekly', priority: '0.9' },
+    { path: '/email-domain', changefreq: 'weekly', priority: '0.8' },
+    { path: '/advisor', changefreq: 'weekly', priority: '0.8' },
+    { path: '/blog', changefreq: 'daily', priority: '0.8' },
+    { path: '/blog/categories', changefreq: 'weekly', priority: '0.6' },
+    { path: '/contact', changefreq: 'monthly', priority: '0.6' },
+    { path: '/support', changefreq: 'monthly', priority: '0.5' },
+    { path: '/privacy-policy', changefreq: 'monthly', priority: '0.3' },
+    { path: '/terms', changefreq: 'monthly', priority: '0.3' },
   ];
+
+  const urls = staticPages.map(p => buildUrlEntry(`${SITE_URL}${p.path}`, today, p.changefreq, p.priority));
+
   try {
     const posts = await fetchAllBlogs();
-    const slugs = posts.map(p => p.slug).filter(Boolean);
-    const xml = generateSitemap(staticPaths, slugs);
-    fs.writeFileSync(path.join(PUBLIC_DIR, 'sitemap.xml'), xml, 'utf8');
-    fs.writeFileSync(path.join(PUBLIC_DIR, 'robots.txt'), generateRobots(), 'utf8');
-    console.log(`Generated sitemap.xml and robots.txt in ${PUBLIC_DIR}`);
-    console.log(`Sitemap URL: ${toUrl('/sitemap.xml')}`);
+    const slugs = posts.filter(p => p.slug);
+    console.log(`Found ${slugs.length} blog posts`);
+    for (const post of slugs) {
+      const lastmod = toW3CDate(post.updated || post.created);
+      urls.push(buildUrlEntry(`${SITE_URL}/blog/${post.slug}`, lastmod, 'weekly', '0.7'));
+    }
   } catch (e) {
-    console.warn('PocketBase not reachable, generating sitemap with static pages only.');
-    const xml = generateSitemap(staticPaths, []);
-    fs.writeFileSync(path.join(PUBLIC_DIR, 'sitemap.xml'), xml, 'utf8');
-    fs.writeFileSync(path.join(PUBLIC_DIR, 'robots.txt'), generateRobots(), 'utf8');
-    console.log(`Generated sitemap.xml and robots.txt (static only) in ${PUBLIC_DIR}`);
+    console.warn('PocketBase not reachable, static pages only:', e.message);
   }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+  const robots = `User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /portal\nDisallow: /cart\nDisallow: /checkout\nDisallow: /payment-qr\nDisallow: /my-orders\nDisallow: /my-services\nDisallow: /my-tickets\nDisallow: /profile\n\nSitemap: ${SITE_URL}/sitemap.xml\n`;
+
+  fs.writeFileSync(path.join(PUBLIC_DIR, 'sitemap.xml'), xml, 'utf8');
+  fs.writeFileSync(path.join(PUBLIC_DIR, 'robots.txt'), robots, 'utf8');
+  console.log(`Generated sitemap.xml (${urls.length} URLs) and robots.txt in ${PUBLIC_DIR}`);
 }
 
 main();

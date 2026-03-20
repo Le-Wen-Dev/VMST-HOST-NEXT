@@ -1,8 +1,13 @@
 User-agent: *
-Disallow: /admin
-Disallow: /dashboard
-Disallow: /login
-Disallow: /user
 Allow: /
+Disallow: /admin
+Disallow: /portal
+Disallow: /cart
+Disallow: /checkout
+Disallow: /payment-qr
+Disallow: /my-orders
+Disallow: /my-services
+Disallow: /my-tickets
+Disallow: /profile
 
 Sitemap: https://vmst.host/sitemap.xml
