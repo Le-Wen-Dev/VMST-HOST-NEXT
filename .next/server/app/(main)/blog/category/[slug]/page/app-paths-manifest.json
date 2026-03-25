@@ -1,3 +1,0 @@
-{
-  "/(main)/blog/category/[slug]/page": "app/(main)/blog/category/[slug]/page.js"
-}

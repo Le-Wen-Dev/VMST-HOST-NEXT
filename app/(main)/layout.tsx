@@ -19,6 +19,11 @@ export const metadata: Metadata = {
     siteName: 'VMST Host',
     locale: 'vi_VN',
     type: 'website',
+    images: [{
+      url: 'https://vmst.host/api/og?title=VMST%20Host&description=Hosting%20gi%C3%A1%20r%E1%BA%BB%20t%E1%BB%91c%20%C4%91%E1%BB%99%20cao',
+      width: 1200,
+      height: 630,
+    }],
   },
   twitter: {
     card: 'summary_large_image',

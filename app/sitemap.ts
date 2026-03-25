@@ -1,5 +1,6 @@
 import type { MetadataRoute } from 'next';
 import PocketBase from 'pocketbase';
+import { getAllGeoSlugs } from '@/data/geo-seo';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,21 @@ const staticPages: MetadataRoute.Sitemap = [
   { url: `${BASE_URL}/privacy-policy`,    priority: 0.3, changeFrequency: 'yearly' },
 ];
 
+// Geo SEO pages — hosting theo tỉnh/thành phố
+function getGeoPages(): MetadataRoute.Sitemap {
+  const geoSlugs = getAllGeoSlugs();
+  return [
+    // Index page
+    { url: `${BASE_URL}/hosting-viet-nam`, priority: 0.9, changeFrequency: 'weekly' as const },
+    // Individual city pages
+    ...geoSlugs.map(slug => ({
+      url: `${BASE_URL}/hosting-viet-nam/${slug}`,
+      priority: 0.8,
+      changeFrequency: 'weekly' as const,
+    })),
+  ];
+}
+
 async function fetchBlogPosts(): Promise<MetadataRoute.Sitemap> {
   try {
     const pb = new PocketBase(PB_URL);
@@ -41,5 +57,6 @@ async function fetchBlogPosts(): Promise<MetadataRoute.Sitemap> {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const blogPosts = await fetchBlogPosts();
-  return [...staticPages, ...blogPosts];
+  const geoPages = getGeoPages();
+  return [...staticPages, ...geoPages, ...blogPosts];
 }

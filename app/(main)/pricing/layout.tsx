@@ -11,6 +11,11 @@ export const metadata: Metadata = {
     siteName: 'VMST Host',
     locale: 'vi_VN',
     type: 'website',
+    images: [{
+      url: 'https://vmst.host/api/og?title=B%E1%BA%A3ng%20gi%C3%A1%20Hosting%2C%20VPS%2C%20Email&description=Gi%C3%A1%20r%E1%BA%BB%20nh%E1%BA%A5t%202026',
+      width: 1200,
+      height: 630,
+    }],
   },
   twitter: {
     card: 'summary_large_image',

@@ -4,6 +4,18 @@ import { getBlogBySlugServer, getBlogImageUrlServer, listBlogsServer } from '@/s
 import { listCategoryBlogsServer } from '@/services/category-blogs-server';
 import BlogPostClient from './BlogPostClient';
 
+export const revalidate = 3600;
+export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  try {
+    const res = await listBlogsServer({ perPage: 200, status: 'published' });
+    return res.items.map((post) => ({ slug: post.slug }));
+  } catch {
+    return [];
+  }
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
 }
@@ -19,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const canonical = `${siteUrl}/blog/${post.slug}`;
   const title = post.seo_title || post.tieu_de;
   const description = post.seo_description || post.mo_ta_ngan || '';
-  const image = (post.thumbnail || post.avatar) ? getBlogImageUrlServer(post) : 'https://placehold.co/1200x630/png?text=VMST%20HOST';
+  const image = (post.thumbnail || post.avatar) ? getBlogImageUrlServer(post) : `https://vmst.host/api/og?title=${encodeURIComponent(title)}&description=${encodeURIComponent(description.slice(0, 100))}`;
 
   return {
     title,
@@ -70,7 +82,7 @@ export default async function BlogPostPage({ params }: Props) {
   const canonical = `${siteUrl}/blog/${post.slug}`;
   const title = post.seo_title || post.tieu_de;
   const description = post.seo_description || post.mo_ta_ngan || '';
-  const image = (post.thumbnail || post.avatar) ? getBlogImageUrlServer(post) : 'https://placehold.co/1200x630/png?text=VMST%20HOST';
+  const image = (post.thumbnail || post.avatar) ? getBlogImageUrlServer(post) : `https://vmst.host/api/og?title=${encodeURIComponent(title)}&description=${encodeURIComponent(description.slice(0, 100))}`;
   const published = post.created || post.ngay_viet || new Date().toISOString();
   const modified = post.updated || post.created || new Date().toISOString();
   const author = post.expand?.tac_gia?.ten || 'VMST HOST';

@@ -11,6 +11,11 @@ export const metadata: Metadata = {
     siteName: 'VMST Host',
     locale: 'vi_VN',
     type: 'website',
+    images: [{
+      url: 'https://vmst.host/api/og?title=Business%20Hosting%20%26%20VPS&description=VPS%20Cloud%20NVMe%2C%20Uptime%2099.9%25',
+      width: 1200,
+      height: 630,
+    }],
   },
   twitter: {
     card: 'summary_large_image',

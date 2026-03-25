@@ -1,3 +1,0 @@
-module.exports=[24941,a=>{"use strict";var b=a.i(7997);function c({children:a}){return(0,b.jsx)(b.Fragment,{children:a})}a.s(["default",()=>c,"metadata",0,{title:"Chính sách bảo mật – VMST Host",description:"Chính sách bảo mật thông tin khách hàng tại VMST Host. Cam kết bảo vệ dữ liệu cá nhân và thông tin thanh toán.",alternates:{canonical:"https://vmst.host/privacy-policy"}}])}];
-
-//# sourceMappingURL=app_%28main%29_privacy-policy_layout_tsx_53ff6f4e._.js.map

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Check, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { listProducts } from '@/services/products';
 import { listBlogs, BlogRecord, getBlogImageUrl } from '@/services/blogs';
@@ -146,9 +147,12 @@ export default function HomePage() {
               </div>
             </div>
             <div className="hidden lg:block animate-fade-in" style={{ animationDelay: '0.2s' }}>
-              <img
+              <Image
                 src="/what-is-web-hosting-1.webp"
-                alt="Hosting Infrastructure"
+                alt="Hosting Infrastructure - VMST Host cung cấp hosting giá rẻ tốc độ cao"
+                width={600}
+                height={400}
+                priority
                 className="rounded-2xl shadow-2xl w-full h-auto"
               />
             </div>
@@ -724,10 +728,13 @@ export default function HomePage() {
                   href={`/blog/${post.slug}`}
                   className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition-all hover:scale-105 cursor-pointer"
                 >
-                  <img
+                  <Image
                     src={getBlogImageUrl(post)}
                     alt={post.tieu_de}
+                    width={400}
+                    height={192}
                     className="w-full h-48 object-cover"
+                    loading="lazy"
                   />
                   <div className="p-6">
                     <p className="text-xs text-gray-500 mb-2">

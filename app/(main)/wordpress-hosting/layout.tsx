@@ -11,6 +11,11 @@ export const metadata: Metadata = {
     siteName: 'VMST Host',
     locale: 'vi_VN',
     type: 'website',
+    images: [{
+      url: 'https://vmst.host/api/og?title=Hosting%20WordPress%20gi%C3%A1%20r%E1%BA%BB&description=OpenLiteSpeed%2C%20SSD%20NVMe%2C%20Backup%20t%E1%BB%B1%20%C4%91%E1%BB%99ng',
+      width: 1200,
+      height: 630,
+    }],
   },
   twitter: {
     card: 'summary_large_image',

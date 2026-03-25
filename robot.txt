@@ -1,8 +1,0 @@
-User-agent: *
-Disallow: /admin
-Disallow: /dashboard
-Disallow: /login
-Disallow: /user
-Allow: /
-
-Sitemap: https://vmst.host/sitemap.xml

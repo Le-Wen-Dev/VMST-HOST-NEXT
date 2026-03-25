@@ -11,6 +11,11 @@ export const metadata: Metadata = {
     siteName: 'VMST Host',
     locale: 'vi_VN',
     type: 'website',
+    images: [{
+      url: 'https://vmst.host/api/og?title=Email%20Doanh%20Nghi%E1%BB%87p&description=Email%20theo%20t%C3%AAn%20mi%E1%BB%81n%2C%20ch%E1%BB%91ng%20spam%2C%20b%E1%BA%A3o%20m%E1%BA%ADt%20cao',
+      width: 1200,
+      height: 630,
+    }],
   },
   twitter: {
     card: 'summary_large_image',
